@@ -44,6 +44,8 @@ third-party library docs; these are the primary sources.
 
 ## What this changes in the design
 
+All of this is now built: see `src/domain/play.ts`, `src/server/play.ts` and the My match screen.
+
 - **Colours.** Put the higher seed first in `users` for games 1, 3 and 5, and the lower seed first for games 2 and 4.
 - **Reading results.** Watch `games-by-users` for finishes (one connection), then fetch each finished game by id.
   Send requests one at a time through a single queue, and back off for a full minute on a 429.

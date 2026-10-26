@@ -5,9 +5,10 @@ standings, no-show rules, and a live public view. The spec is
 the Castle Connect UG tournament app brief (version 1, 22 October 2026); the look and rules were first shown in a
 clickable prototype. Neither file is in this repository.
 
-**Status: scaffold.** Sign-up, check-in, the bracket and match rules, the schedule, roles and the audit log work
-end to end against a *simulated* Lichess and an *in-memory* store. Nothing talks to the real Lichess yet. See
-[Not built yet](#not-built-yet).
+**Status: scaffold.** Sign-up, check-in, the bracket and match rules, the schedule, roles, the audit log, and the
+player match screen with its referee desk work end to end. The store is *in-memory*, and Lichess login is still a
+*stand-in*. Game links and results can talk to the real Lichess (`LICHESS_MODE=live`) and are checked against it; by
+default a mock is used. See [Not built yet](#not-built-yet).
 
 ## Run it
 
@@ -26,17 +27,25 @@ npm run dev        # http://localhost:3000
 In development, "Log in with Lichess" is a stand-in: type any username. `Joel` is the super admin, `Ruth_Ref` a
 referee, `Dan_Desk` the check-in desk, anyone else a player (try `Mercy_K`, as in the prototype). The demo has 41
 players signed up for Sunday 1 November 2026, 14:00. To see a bracket the size of the prototype's, log in as Joel and
-build it with 8 qualifiers. Copy [`.env.example`](.env.example) to change any of this.
+build it with 8 qualifiers, then log in as one of the two players of the first match and open **My match**. With the
+mock Lichess a development-only panel plays the part of both players (join, win, draw, abort), so every state can be
+reached by hand. Copy [`.env.example`](.env.example) to change any of this, including `LICHESS_MODE=live`.
+
+To run the checks against the real Lichess with the throwaway test accounts (skipped by default):
+
+```bash
+LICHESS_LIVE_TESTS=1 npx vitest run src/server/lichess/http.live.test.ts
+```
 
 ## Stack, and why
 
 | Layer     | Choice                                | Why                                                                                              |
 | --------- | ------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | App       | Next.js 16 (App Router), React 19, TS | One codebase for pages, server actions and the Lichess login callbacks. Runs on any Node host.   |
-| Rules     | Plain TypeScript in `src/domain`      | Bracket, match, no-show, sign-up and schedule rules with no framework in them. 85 of the tests.  |
+| Rules     | Plain TypeScript in `src/domain`      | Bracket, match, no-show, sign-up and schedule rules with no framework in them. 100+ of the tests. |
 | Rendering | Partial Prerender (Cache Components)  | Every page is a static shell with the live part streamed in, which suits phones on mobile data.  |
 | Styling   | Plain CSS, brand tokens               | Light pages, no UI library. Emerald, gold and cream, with a dark mode.                            |
-| Lichess   | One interface, mock behind it         | The real client slots in after the checks in section 8 of the brief.                              |
+| Lichess   | One interface; a mock and a live client | Develop and demo on the mock, run a real event on the live client (`LICHESS_MODE=live`).        |
 | Data      | In-memory `Store` class               | Stand-in for Postgres, so the swap stays in one file.                                             |
 | Login     | Signed `httpOnly` cookie              | The username only ever comes from the Lichess login, never from a typed field.                    |
 | Tests     | Vitest                                | Fast, no setup, runs the domain code in plain Node.                                               |
@@ -57,8 +66,12 @@ src/domain/    The rules. Pure functions, no I/O, no framework.
   format.ts      field size -> Swiss rounds and cut-off; seeding for a straight knockout
   permissions.ts roles, deny by default
   phone.ts       +256 format check
-src/server/    store.ts (all state and every change, with permission checks), session.ts, lichess/ (mock)
-src/app/       pages (/, /bracket, /organizer) and actions.ts (Server Actions)
+  play.ts        the waiting windows, Lichess game status -> result, who won given the colours, claim rules
+src/server/    store.ts (all state and every change, with permission checks), session.ts
+  play.ts        playing a match: ready, the shared Lichess link, reading results, aborts, claims, problems
+  match-screen.ts  what each player sees of their match
+  lichess/       the interface, a mock (with a simulator), and the live client (http.ts)
+src/app/       pages (/, /bracket, /match, /organizer) and actions.ts (Server Actions)
 src/components/
 ```
 
@@ -76,14 +89,23 @@ These fill gaps in the brief. Each is one constant or one line, so they are chea
 6. **The super admin keeps access after the tournament ends**; admins do not. The fair-play review runs for 24 hours
    afterwards.
 7. **Waitlisted players who get promoted still have to check in**; the desk can check them in.
+8. **The first 3-minute wait starts the moment a match becomes ready**, because the bracket rolls. The 2-minute wait
+   after a game ends is also used for games 3 to 5 and for a game that has to be replayed.
+9. **An aborted game counts as not played.** Lichess cannot be told to block aborts, and an early resignation is
+   recorded as one. The game is replayed on a new link and both players tap ready again. Two aborts in one match call
+   a referee. Joel still has to decide who is at fault and how many are allowed.
+10. **Lichess game rules:** `noRematch`, `noGiveTime` and `noEarlyDraw` on, `noClaimWin` off (`GAME_RULES` in
+    `src/domain/play.ts`).
+11. **A no-show claim needs a referee.** The waiting player taps Claim win, and a referee confirms or turns it down.
+    Results are read from Lichess every 8 seconds while a player has the match screen open.
 
 ## Not built yet
 
-- **Real Lichess:** OAuth login, reading the Swiss, restricted challenge links, reading results. This waits on the
-  verification checks in section 8 of the brief, which need test accounts.
+- **Real Lichess login** (OAuth). Game links, results and standings already work against the real Lichess; login is
+  still a stand-in that lets anyone log in as anyone, so it is refused in production unless switched on.
+- **A background reader of results.** Games are read while a player has the match screen open. A game that finishes
+  while both players have closed the page is picked up when either returns, or when a referee sets the result.
 - **A database.** All state is lost when the server restarts.
-- **The player match screen:** "I'm ready", the 3-minute countdown, Claim win, Play on Lichess, report a problem. Until
-  then, organizers set results by hand, which the brief wants as the fallback anyway.
 - **Round control and the Swiss view:** starting rounds, the bubble, matches waiting or flagged.
 - **Admin management:** adding admins and ticking their permissions. The roles and checks exist; there is no screen.
 - **Rating snapshot** when sign-ups close, the two-admin edit warning, and data deletion requests.
