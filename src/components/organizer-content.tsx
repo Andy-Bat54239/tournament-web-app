@@ -4,7 +4,11 @@ import { planFormat } from "@/domain/format";
 import { openMatches } from "@/domain/knockout";
 import { field, rosterCounts } from "@/domain/registration";
 import { announcementText } from "@/domain/schedule";
+import { swissProgress } from "@/domain/swiss";
 import { readStore } from "@/server/instance";
+import { getLichess } from "@/server/lichess";
+import { ask } from "@/server/lichess/ask";
+import type { LichessClient } from "@/server/lichess/types";
 import { getSessionUsername } from "@/server/session";
 import { LoginCard } from "./login-card";
 import {
@@ -16,8 +20,18 @@ import {
   RefereeCard,
   ResultsCard,
   ScheduleCard,
+  type SwissView,
 } from "./organizer-cards";
 import type { MatchOption } from "./results-form";
+
+/** Where the chosen Swiss has got to, asked of Lichess. Null when no Swiss is chosen. */
+async function swissView(swissId: string | null, lichess: LichessClient): Promise<SwissView | null> {
+  if (!swissId) return null;
+  const found = await ask(() => lichess.getSwiss(swissId));
+  if (!found.ok) return { id: swissId, name: null, progress: null, problem: found.error };
+  if (!found.value) return { id: swissId, name: null, progress: null, problem: "Lichess has no Swiss with this id any more." };
+  return { id: swissId, name: found.value.name, progress: swissProgress(found.value), problem: null };
+}
 
 /** Organizer tools. Each card shows only if the viewer has that permission; the store enforces it again on every change. */
 export async function OrganizerContent() {
@@ -37,6 +51,9 @@ export async function OrganizerContent() {
   const access = store.access(username);
   const can = (p: Parameters<typeof store.can>[1]) => store.can(username, p);
   const anyAccess = access && (access.superAdmin || access.grants.some((g) => can(g)));
+
+  const lichess = getLichess();
+  const swiss = can("rounds") && !store.tournament.bracket ? await swissView(store.tournament.swissId, lichess) : null;
 
   const who = (
     <form action={logout} className="who">
@@ -101,6 +118,8 @@ export async function OrganizerContent() {
           plan={planFormat(players.length)}
           players={players.length}
           built={tournament.qualifiers?.length ?? null}
+          swiss={swiss}
+          live={lichess.live}
         />
       )}
       {(can("result") || can("forfeit")) && (

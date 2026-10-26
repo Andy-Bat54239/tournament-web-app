@@ -5,6 +5,7 @@ import {
   endTournament,
   removeNoShows,
   resetBracket,
+  setSwiss,
   settleMatch,
 } from "@/app/actions";
 import type { FormatPlan } from "@/domain/format";
@@ -36,14 +37,27 @@ export function ScheduleCard({ date, time }: { date: string; time: string }) {
   );
 }
 
+/** The Swiss the knockout is seeded from, as Lichess reports it. `problem` is set when Lichess could not be asked. */
+export interface SwissView {
+  id: string;
+  name: string | null;
+  progress: string | null;
+  problem: string | null;
+}
+
 export function BracketCard({
   plan,
   players,
   built,
+  swiss,
+  live,
 }: {
   plan: FormatPlan | null;
   players: number;
   built: number | null;
+  swiss: SwissView | null;
+  /** Whether Lichess is the real one. If not, the Swiss is simulated and none needs choosing. */
+  live: boolean;
 }) {
   if (built !== null) {
     return (
@@ -69,6 +83,33 @@ export function BracketCard({
             ? `${players} registered. That is a straight knockout of ${plan.knockoutRounds} rounds, seeded by rating.`
             : `${players} registered: a ${plan.swissRounds}-round Swiss, then the top ${plan.qualifiers} play a ${plan.knockoutRounds}-round knockout.`}
       </p>
+      {plan?.kind === "swiss_knockout" && (
+        <>
+          <ActionForm action={setSwiss}>
+            <label htmlFor="swiss">Lichess Swiss tournament{live ? "" : " (optional while Lichess is simulated)"}</label>
+            <input
+              id="swiss"
+              name="swiss"
+              inputMode="url"
+              autoCapitalize="none"
+              autoCorrect="off"
+              placeholder="https://lichess.org/swiss/AbCdEfGh"
+              defaultValue={swiss ? `https://lichess.org/swiss/${swiss.id}` : ""}
+              required
+            />
+            <SubmitButton className="wide quiet">Use this Swiss</SubmitButton>
+          </ActionForm>
+          <p className="note">
+            {swiss
+              ? swiss.problem
+                ? `Swiss ${swiss.id}: ${swiss.problem}`
+                : `${swiss.name}: ${swiss.progress}.`
+              : live
+                ? "No Swiss chosen yet. Create it on Lichess in the Castle Connect team, then paste its link here."
+                : "No Swiss chosen. The standings are invented while Lichess is simulated."}
+          </p>
+        </>
+      )}
       {plan !== null && (
         <ActionForm action={buildBracket}>
           <label htmlFor="qualifiers">Qualifiers (leave blank for the standard cut-off)</label>
@@ -78,10 +119,7 @@ export function BracketCard({
           </SubmitButton>
         </ActionForm>
       )}
-      <p className="note">
-        {/* The mock Swiss stands in for Lichess until the API checks are done. */}
-        Standings are simulated for now. Lichess is not connected yet.
-      </p>
+      {!live && <p className="note">Lichess is simulated here, so the standings are invented.</p>}
     </div>
   );
 }
