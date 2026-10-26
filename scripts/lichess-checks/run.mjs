@@ -437,8 +437,10 @@ async function rateLimits() {
 }
 
 
-// Swiss checks (5 and 6). Usage: run.mjs swiss-ties [teamId] | swiss-no-show [teamId]
-// Three accounts in a 3-round Swiss on blitz 1+3, unrated, played through the Board API.
+// Swiss checks. Usage: run.mjs swiss-no-show [teamId]
+// Three accounts in a 3-round team Swiss on blitz 1+3, unrated. The Board API refuses tournament games
+// ("This game cannot be played with the Board API"), so no moves can be made: this only watches what
+// Lichess does by itself when nobody moves.
 
 const swissTeam = () => process.argv[3] ?? "ccug-test-team";
 const swissInfo = (id) => api({ path: `/api/swiss/${id}` });
@@ -461,18 +463,6 @@ async function swissGames(players, swissId) {
     }
   }
   return [...games.values()].filter((g) => g.white && g.black);
-}
-
-const MATES = {
-  white: [["white", "e2e4"], ["black", "f7f6"], ["white", "d2d4"], ["black", "g7g5"], ["white", "d1h5"]],
-  black: [["white", "f2f3"], ["black", "e7e5"], ["white", "g2g4"], ["black", "d8h4"]],
-};
-
-async function playToMate(game, winnerColor) {
-  for (const [color, uci] of MATES[winnerColor]) {
-    const res = await move(game[color], game.id, uci);
-    if (!res.ok) throw new Error(`Move ${uci} was refused in game ${game.id}: ${res.status} ${res.raw.slice(0, 160)}`);
-  }
 }
 
 async function createAndJoinSwiss(players, name) {
@@ -503,7 +493,7 @@ async function createAndJoinSwiss(players, name) {
   return created.json.id;
 }
 
-/** Plays rounds as they appear. `onGame(game, round, earlier)` plays one game and returns what to record. */
+/** Watches rounds as they appear. `onGame(game, round, earlier)` handles one game and returns what to record. */
 async function runSwiss(id, players, onGame, deadlineMs = 20 * 60_000) {
   const handled = new Set();
   const rounds = [];
@@ -523,6 +513,7 @@ async function runSwiss(id, players, onGame, deadlineMs = 20 * 60_000) {
           round.games.push(await onGame(game, round, rounds));
         }
         rounds.push(round);
+        if (round.games.some((g) => g.stalled)) return { info: (await swissInfo(id)).json, rounds, stalled: true };
       }
     }
     await sleep(5_000);
@@ -537,52 +528,7 @@ async function finishSwiss(A, id, info) {
   }
 }
 
-/** Check 5: a three-way tie on points, to see how the tiebreak orders it, and how byes score. */
-async function swissTies() {
-  const { A, B, C } = await needAccounts("A", "B", "C");
-  const players = [A, B, C];
-  const id = await createAndJoinSwiss(players, "CC api check: ties");
-  if (!id) return;
-  note("Swiss", `https://lichess.org/swiss/${id}`);
-  let outcome;
-  try {
-    // With 3 players each round is one game and one bye. Aim for a cycle: round 1 White wins, then the
-    // round-1 bye player beats the round-1 winner, then the round-1 loser beats the round-1 bye player.
-    outcome = await runSwiss(id, players, async (game, round, earlier) => {
-      const first = earlier[0];
-      const want = round.round === 2 ? first?.bye[0] : round.round === 3 ? first?.games[0].loser : undefined;
-      const winnerColor = game.white.key === want ? "white" : game.black.key === want ? "black" : "white";
-      await playToMate(game, winnerColor);
-      const ended = summarize(await waitForEnd(game.id, 20_000, 2_000));
-      const loserColor = winnerColor === "white" ? "black" : "white";
-      return { id: game.id, white: game.white.key, black: game.black.key, winner: game[winnerColor].key, loser: game[loserColor].key, status: ended?.status };
-    });
-    check("the Swiss ran to the end", outcome.info?.status === "finished", `status ${outcome.info?.status}${outcome.timedOut ? ", timed out" : ""}`);
-    note("rounds", outcome.rounds);
-    note("tournament JSON at the end", outcome.info);
-
-    const standings = await swissStandings(id);
-    note("final standings", standings.map((r) => ({ rank: r.rank, user: r.username, points: r.points, tieBreak: r.tieBreak, performance: r.performance, absent: r.absent })));
-    const sorted = [...standings].sort((a, b) => b.points - a.points || b.tieBreak - a.tieBreak || b.performance - a.performance);
-    check("rank follows points, then tieBreak, then performance", standings.every((row, i) => row.username === sorted[i].username));
-    check("the test produced a tie on points, so the tiebreak was exercised", new Set(standings.map((r) => r.points)).size < standings.length, `points ${standings.map((r) => r.points).join(", ")}`);
-
-    // What the Sonneborn-Berger sum would be from the games, using each opponent's final points, against what Lichess reports.
-    const points = Object.fromEntries(players.map((p) => [p.key, standings.find((r) => r.username.toLowerCase() === p.name.toLowerCase())?.points]));
-    const rows = players.map((p) => {
-      const wins = outcome.rounds.flatMap((r) => r.games).filter((g) => g.winner === p.key);
-      const byes = outcome.rounds.filter((r) => r.bye.includes(p.key)).length;
-      const row = standings.find((r) => r.username.toLowerCase() === p.name.toLowerCase());
-      const sbFromGames = wins.reduce((sum, g) => sum + points[g.loser], 0);
-      return { player: p.key, points: row?.points, wins: wins.length, byes, pointsPerBye: byes ? (row.points - wins.length) / byes : null, reportedTieBreak: row?.tieBreak, sbFromGameWins: sbFromGames };
-    });
-    note("tiebreak against a Sonneborn-Berger sum from the game wins", rows);
-  } finally {
-    await finishSwiss(A, id, outcome?.info);
-  }
-}
-
-/** Check 6: one player never moves. What happens to the game, the score, and the next round's pairings. */
+/** Check 6: nobody moves. How long until Lichess ends the game itself, how it is scored, and who is marked absent. */
 async function swissNoShow() {
   const { A, B, C } = await needAccounts("A", "B", "C");
   const players = [A, B, C];
@@ -592,32 +538,17 @@ async function swissNoShow() {
   let outcome;
   try {
     outcome = await runSwiss(id, players, async (game) => {
-      if (game.white !== C && game.black !== C) {
-        await playToMate(game, "white");
-        return { id: game.id, white: game.white.key, black: game.black.key, cSilent: false, status: summarize(await waitForEnd(game.id, 20_000, 2_000))?.status };
-      }
-      // C never moves. If C is Black, White still plays 1.e4 first.
-      const opponent = game.white === C ? game.black : game.white;
-      if (game.black === C) await move(game.white, game.id, "e2e4");
       const started = Date.now();
-      const last = await waitForEnd(game.id, 240_000, 5_000);
-      const ended = last && !["created", "started"].includes(last.status);
-      const result = { id: game.id, white: game.white.key, black: game.black.key, cSilent: true, afterSeconds: Math.round((Date.now() - started) / 1000), ...summarize(last) };
-      if (!ended) {
-        await board(opponent, game.id, "abort");
-        await board(opponent, game.id, "resign");
-        result.forced = "the opponent aborted or resigned after 240 s";
-        result.statusAfterForce = summarize((await exportGame(game.id)).json)?.status;
-      }
-      return result;
+      const last = await waitForEnd(game.id, 300_000, 5_000);
+      const ended = Boolean(last) && !["created", "started"].includes(last.status);
+      return { id: game.id, white: game.white.key, black: game.black.key, ended, stalled: !ended, afterSeconds: Math.round((Date.now() - started) / 1000), ...summarize(last) };
     });
     note("rounds", outcome.rounds);
     note("tournament JSON at the end", outcome.info);
     const standings = await swissStandings(id);
-    note("final standings", standings.map((r) => ({ rank: r.rank, user: r.username, points: r.points, tieBreak: r.tieBreak, absent: r.absent })));
-    const cRounds = outcome.rounds.map((r) => ({ round: r.round, cPlayed: r.games.some((g) => g.white === "C" || g.black === "C"), cBye: r.bye.includes("C") }));
-    note("did C appear in each round", cRounds);
-    check("the Swiss ran to the end", outcome.info?.status === "finished", `status ${outcome.info?.status}${outcome.timedOut ? ", timed out" : ""}`);
+    note("standings", standings.map((r) => ({ rank: r.rank, user: r.username, points: r.points, tieBreak: r.tieBreak, performance: r.performance, absent: r.absent })));
+    check("Lichess ended the unplayed game by itself", outcome.rounds.length > 0 && !outcome.stalled, outcome.stalled ? "still running after 300 s" : "");
+    check("the Swiss ran to the end", outcome.info?.status === "finished", `status ${outcome.info?.status}${outcome.timedOut ? ", timed out" : ""}${outcome.stalled ? ", a game stalled" : ""}`);
   } finally {
     await finishSwiss(A, id, outcome?.info);
   }
@@ -632,7 +563,6 @@ const commands = {
   options,
   results,
   timeouts,
-  "swiss-ties": swissTies,
   "swiss-no-show": swissNoShow,
   "rate-limits": rateLimits,
 };
