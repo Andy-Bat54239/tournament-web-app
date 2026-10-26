@@ -8,7 +8,7 @@ third-party library docs; these are the primary sources.
 
 | # | Check | Status | Finding |
 | - | ----- | ------ | ------- |
-| 1 | Restricted link refuses a third account | **Verified live (API); browser half pending** | Account C (not named) and a logged-out request were both refused with "The challenge is not for you to accept", asking for a colour did not get round it, and no game was created. A and B could join, and the first name listed had White. Usernames match ignoring case. Still to do: open the real link in a browser as C and logged out. |
+| 1 | Restricted link refuses a third account | **Verified live, API and browser** | API: account C (not named) and a logged-out request were both refused with "The challenge is not for you to accept", asking for a colour did not get round it, and no game was created. A and B could join, and the first name listed had White. Usernames match ignoring case. Browser: the real link, opened logged out and as the unnamed account C, shows only "Waiting for andybat7 and andybat22 to start the game" with no way to join. Afterwards the challenge was still open and no game existed for it. This is the check the whole link design depends on, and it holds. |
 | 2 | How long an unjoined challenge lasts | **Done** | Docs: 24 hours by default, `expiresAt` up to 2 weeks. Live: a challenge with `expiresAt` = now + 60 s returned 404 after expiry and could not be joined. The challenge JSON has no expiry field, so the default cannot be read back. |
 | 3 | Results by game id | **Done, one gap** | Live: `mate` and `resign` give `status` plus `winner` (`white` or `black`). `draw`, and `aborted`, have no `winner`. A fresh game reads `started`. An unfinished game's move count is delayed, so ignore it. Not yet seen: `noStart` and `timeout`. |
 | 4 | Options to stop dodging a game | **Done** | Live: `noAbort` is refused with "restricted to challenge administrators", so **aborts cannot be blocked**. Comma-separated rules are accepted. `noEarlyDraw` works: a draw agreed after 2 plies is ignored. **`noGiveTime` does not stop the add-time API**: it still added 15 seconds (measured), so it likely only removes the in-game button. `noRematch` and `noClaimWin` are untested. |
@@ -55,6 +55,5 @@ third-party library docs; these are the primary sources.
 
 ## Still to do
 
-- The browser half of the restricted-link check: open the link as an unnamed account and logged out.
 - Optional: a Swiss played by hand on lichess.org with a deliberate three-way tie, to see the tiebreak order live. The
   source already answers it, and the app only reads Lichess's `rank`.
