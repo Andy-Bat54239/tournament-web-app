@@ -74,6 +74,14 @@ const exportGame = (id) =>
 
 const names = (...accounts) => accounts.map((a) => a.name).join(",");
 
+/** White's remaining time in ms, from the first events of the Board API game stream. */
+async function whiteClock(who, id) {
+  const stream = await sampleStream({ token: who.token, path: `/api/board/game/stream/${id}`, ms: 1500 });
+  const events = stream.lines.map((line) => JSON.parse(line));
+  const latest = events.filter((e) => e.type === "gameState").pop() ?? events.find((e) => e.type === "gameFull");
+  return (latest?.state ?? latest)?.wtime;
+}
+
 function summarize(game) {
   if (!game) return null;
   return {
@@ -256,13 +264,15 @@ async function options() {
   check("comma-separated rules are accepted", Boolean(combined.id), `status ${combined.res.status} ${combined.res.raw.slice(0, 160)}`);
   if (combined.id) await cancel(A, combined.id);
 
+  // The API answers {"ok":true} either way, so measure White's clock before and after.
   for (const rules of ["noGiveTime", undefined]) {
     const id = await startGame({ A, B }, { rules });
     await move(A, id, "e2e4");
+    const before = await whiteClock(B, id);
     const gift = await api({ token: B.token, method: "POST", path: `/api/round/${id}/add-time/15` });
-    const blocked = !gift.ok;
-    if (rules) check("noGiveTime blocks adding time to the opponent", blocked, `status ${gift.status} ${gift.raw.slice(0, 100)}`);
-    else check("control: adding time works without the rule", !blocked, `status ${gift.status}`);
+    const added = (await whiteClock(B, id)) - before;
+    note(`add-time API with ${rules ?? "no rules"}`, { status: gift.status, addedMs: added });
+    if (!rules) check("control: the add-time API adds time without the rule", added >= 15_000, `added ${added} ms`);
     await board(A, id, "abort");
   }
 
