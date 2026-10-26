@@ -387,7 +387,7 @@ async function timeouts() {
 
 /** Check 8: how much the API tolerates at 64-player scale, one request at a time. */
 async function rateLimits() {
-  const { A, B, C } = await needAccounts("A", "B", "C");
+  const { A, B, C } = await needAccounts("A", "B");
   const users = names(A, B);
 
   const made = [];
@@ -427,7 +427,7 @@ async function rateLimits() {
   const stream = await sampleStream({
     method: "POST",
     path: "/api/stream/games-by-users",
-    text: names(A, B, C),
+    text: [...new Set([A, B, C].filter(Boolean).map((account) => account.name))].join(","),
     ms: 6_000,
   });
   check("the games-by-users stream opens", stream.status === 200, `status ${stream.status} ${stream.raw ?? ""}`);
