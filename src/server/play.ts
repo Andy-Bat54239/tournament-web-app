@@ -36,6 +36,12 @@ async function ask<T>(call: () => Promise<T>): Promise<{ ok: true; value: T } | 
   }
 }
 
+/**
+ * Links being made on Lichess, by match and game. Shared by every request in this process, so two players who
+ * tap at the same moment still get one link, even though each request works on its own copy of the state.
+ */
+const linksInFlight = new Map<string, Promise<GameLink>>();
+
 /** A player's open match: the one they can play right now. */
 export interface MyMatch {
   match: ResolvedMatch;
@@ -77,8 +83,8 @@ export interface DeskProblem extends ProblemReport {
  *  - a player who never joins leaves no game at all, only a challenge, which the app can cancel.
  */
 export class MatchPlayService {
-  private readonly linksInFlight = new Map<string, Promise<GameLink>>();
   private pendingCancels: string[] = [];
+  private madeLinks: string[] = [];
 
   constructor(private readonly store: Store) {}
 
@@ -114,6 +120,16 @@ export class MatchPlayService {
   takeCancels(): string[] {
     const taken = this.pendingCancels;
     this.pendingCancels = [];
+    return taken;
+  }
+
+  /**
+   * Links made on Lichess since the last call. Whoever saves the store checks which of them ended up in the
+   * saved state, and closes the rest: a save that lost a race to another server leaves its link unused.
+   */
+  takeMadeLinks(): string[] {
+    const taken = this.madeLinks;
+    this.madeLinks = [];
     return taken;
   }
 
@@ -185,7 +201,7 @@ export class MatchPlayService {
     }
 
     const key = `${match.id}:${round.game}`;
-    let pending = this.linksInFlight.get(key);
+    let pending = linksInFlight.get(key);
     if (!pending) {
       const white = whiteInGame(round.game) === "hi" ? match.hi : match.lo;
       const black = whiteInGame(round.game) === "hi" ? match.lo : match.hi;
@@ -196,22 +212,19 @@ export class MatchPlayService {
         expiresAt: new Date(now.getTime() + LINK_LIFETIME),
         name: `Castle Connect: ${match.title}, game ${round.game}`,
       });
-      this.linksInFlight.set(key, pending);
-      const forget = () => void this.linksInFlight.delete(key);
+      linksInFlight.set(key, pending);
+      const forget = () => void linksInFlight.delete(key);
       pending.then(forget, forget);
     }
     const shared = pending;
     const created = await ask(() => shared);
     if (!created.ok) return created;
+    // Whatever happens below, the link exists on Lichess: if the state does not keep it, it is closed afterwards.
+    this.madeLinks.push(created.value.id);
 
     const current = this.state[match.id]?.round;
-    if (!current || current.game !== round.game) {
-      // The match moved on while Lichess was answering.
-      this.pendingCancels.push(created.value.id);
-      return fail("The match has moved on. Reload the page.");
-    }
+    if (!current || current.game !== round.game) return fail("The match has moved on. Reload the page.");
     current.link ??= { id: created.value.id, url: created.value.url, createdAt: now.toISOString() };
-    if (current.link.id !== created.value.id) this.pendingCancels.push(created.value.id);
     return { ok: true, url: current.link.url };
   }
 
