@@ -304,13 +304,13 @@ async function results() {
   const pair = { A, B };
   const scenarios = [
     { key: "checkmate", play: async (id) => { await move(A, id, "f2f3"); await move(B, id, "e7e5"); await move(A, id, "g2g4"); await move(B, id, "d8h4"); } },
-    { key: "resignation", play: async (id) => { await move(A, id, "e2e4"); await board(B, id, "resign"); } },
+    { key: "resignation", play: async (id) => { await move(A, id, "e2e4"); await move(B, id, "e7e5"); await board(B, id, "resign"); } },
+    // Lichess treats a resignation before both players have moved as an abort.
+    { key: "resign-before-both-moved", play: async (id) => { await move(A, id, "e2e4"); await board(B, id, "resign"); } },
     { key: "draw-by-agreement", play: async (id) => { await move(A, id, "e2e4"); await move(B, id, "e7e5"); await board(A, id, "draw/yes"); await board(B, id, "draw/yes"); } },
     { key: "abort-before-moves", play: async (id) => { await board(A, id, "abort"); } },
     { key: "blitz-5+2-classification", play: async (id) => { await board(A, id, "abort"); } },
-    { key: "clock-runs-out", clock: [15, 0], wait: 60_000, play: async (id) => { await move(A, id, "e2e4"); await move(B, id, "e7e5"); } },
-    { key: "white-never-moves", clock: [15, 0], wait: 120_000, play: async () => {} },
-    { key: "black-never-moves", clock: [15, 0], wait: 120_000, play: async (id) => { await move(A, id, "e2e4"); } },
+    // Timeouts and no-shows are in the `timeouts` command. The Board API cannot play ultrabullet (15s) games.
   ];
 
   const out = {};
