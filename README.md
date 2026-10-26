@@ -119,6 +119,29 @@ instance has its own reader, so on serverless hosting expect about one read per 
 bracket is built, the standings kept with it are shown under the bracket and Lichess is not asked again. Building the
 bracket never uses the shared reader: it reads the final standings from Lichess itself.
 
+**The wide layout for a projector.** The public Bracket page is one link for phones and for a projector. Below
+1280 pixels wide it is the single phone column. From 1280 pixels up it is laid out as if the screen were about 1300
+to 1400 pixels wide and then scaled up to fit it in steps (1280: ×1, 1600: ×1.15, 1920: ×1.35, 2560: ×1.8, 3200:
+×2.25, 3840: ×2.7), so a 1080p projector and a 4K television show the same arrangement with larger type. The scale
+is CSS `zoom` on the page body (`body:has(.live)` in `globals.css`), so the header and the tabs grow with it. On
+a wide screen:
+
+- The rounds run across the page, one column each, and a later match sits level with the two that feed it. A card is
+  only the two players and the score: a tag on its edge says **Ready to play** or **In progress**, the winner's name
+  is bold and the loser's is dimmed, and the game by game lines and "next game" notes stay on the phone. A note
+  stays where it explains something unusual (an advance after a no-show, a walkover, neither player showing).
+- Up to four rounds (16 qualifiers or fewer), the Swiss sits beside the bracket, stopping three places below the
+  line with "and N more below the line". With five rounds (32 qualifiers) the bracket takes the whole width and the
+  Swiss runs in columns under it. The Swiss with no bracket yet takes the whole width too: 64 players show as four
+  columns of 16, with the line, the marks and the sentences under them. (`standingsColumns` in `cutoff.ts`.)
+- **Full screen** (a button above the page, shown only where the browser can do it) hides the site header and the
+  tabs, so the page has the whole screen. At 1920×1080 a bracket of 16 qualifiers with its standings fits one
+  screen, and so does the table of a 64-player Swiss (the sentences under it may need a small scroll). A bracket of
+  32 qualifiers is taller than a screen at a readable size, so it scrolls. Esc leaves full screen.
+
+The scale follows the screen's width in CSS pixels, so the browser's own zoom (Ctrl + and Ctrl −) moves the page
+between steps rather than scaling it smoothly: it can make the type a little smaller before it makes it bigger.
+
 **Reading results without anyone looking.** While a player has the match screen open it reads their game every few
 seconds. Games that end when nobody has the page open are read by a separate pass, which looks up every match with a
 game link out, one at a time, and records finished games, aborts and odd results exactly as the match screen does.
@@ -185,7 +208,8 @@ src/domain/    The rules. Pure functions, no I/O, no framework.
   registration.ts  64 cap, waitlist, check-in, removing no-shows
   schedule.ts    everything worked out from the start time, in East Africa Time
   format.ts      field size -> Swiss rounds and cut-off; seeding for a straight knockout
-  cutoff.ts      the cut-off line: who is through, out or on the bubble, and the sentences under the table
+  cutoff.ts      the cut-off line: who is through, out or on the bubble, the sentences under the table, and how many
+                 columns a long table of standings gets on a wide screen
   swiss.ts       reading a Swiss link, where it has got to, how many rounds can still change the points
   permissions.ts roles, deny by default
   phone.ts       +256 format check
@@ -240,4 +264,5 @@ These fill gaps in the brief. Each is one constant or one line, so they are chea
 - **Rating snapshot** when sign-ups close, the two-admin edit warning, and data deletion requests.
 - **Phase 2:** the standings image, round announcement text, and push notifications.
 - **The rules, fair-play and consent wording** (the brief lists it as open). The sign-up checkbox is a placeholder.
-- **A wide projector layout** for the public view. It is a single phone-width column today.
+- **A smooth text-size control for the projector.** The wide layout scales in steps from the screen's width and has
+  no size buttons of its own. A bracket of 32 qualifiers scrolls on a 1080p screen.
