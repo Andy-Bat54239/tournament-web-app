@@ -26,7 +26,8 @@ node scripts/lichess-checks/run.mjs manual-link create   # check 1, browser half
 node scripts/lichess-checks/run.mjs manual-link verify
 node scripts/lichess-checks/run.mjs expiry           # check 2 (takes about 90 seconds)
 node scripts/lichess-checks/run.mjs options          # check 4
-node scripts/lichess-checks/run.mjs results          # checks 3 and 7 (takes a few minutes)
+node scripts/lichess-checks/run.mjs results          # checks 3 and 7 (takes about a minute)
+node scripts/lichess-checks/run.mjs timeouts         # clock flags and no-shows (takes about 2.5 minutes)
 node scripts/lichess-checks/run.mjs rate-limits      # check 8
 ```
 

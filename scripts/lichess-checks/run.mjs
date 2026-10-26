@@ -336,6 +336,55 @@ async function results() {
   save("results-games", out);
 }
 
+/**
+ * Checks 3 and 6, game side: does Lichess end a game by itself when a clock runs out or a player never moves?
+ * Blitz clocks only (1+3), because the Board API refuses anything faster. Each case runs twice: with both
+ * players holding the game stream open, like a browser tab, and API-only, with nobody connected.
+ */
+async function timeouts() {
+  const { A, B } = await needAccounts("A", "B");
+  const FINAL = ["aborted", "mate", "resign", "draw", "outoftime", "timeout", "noStart", "stalemate", "cheat", "unknownFinish"];
+  const waitMs = 130_000;
+  const plans = [
+    { key: "clock runs out", moves: [[A, "e2e4"], [B, "e7e5"]] },
+    { key: "nobody moves", moves: [] },
+    { key: "Black silent after 1.e4", moves: [[A, "e2e4"]] },
+  ].flatMap((plan) => [{ ...plan, connected: true }, { ...plan, connected: false }]);
+
+  const games = [];
+  for (const plan of plans) {
+    const id = await startGame({ A, B }, { clock: [60, 3] });
+    games.push({ ...plan, id, streams: [] });
+  }
+  for (const game of games.filter((g) => g.connected)) {
+    for (const who of [A, B]) game.streams.push(sampleStream({ token: who.token, path: `/api/board/game/stream/${game.id}`, ms: waitMs + 5_000 }));
+  }
+  await sleep(2_000);
+  for (const game of games) for (const [who, uci] of game.moves) await move(who, game.id, uci);
+
+  const started = Date.now();
+  const ended = new Map();
+  while (Date.now() - started < waitMs && ended.size < games.length) {
+    await sleep(10_000);
+    for (const game of games.filter((g) => !ended.has(g.id))) {
+      const result = summarize((await exportGame(game.id)).json);
+      if (result && FINAL.includes(result.status)) ended.set(game.id, { ...result, afterSeconds: Math.round((Date.now() - started) / 1000) });
+    }
+  }
+  for (const game of games) {
+    const result = ended.get(game.id);
+    note(`${game.key}, ${game.connected ? "players connected" : "API only"}`, result ?? `not finished after ${waitMs / 1000}s`);
+    if (!result) {
+      await board(A, game.id, "abort");
+      await board(A, game.id, "resign");
+    }
+  }
+  const flagged = (connected) => ended.get(games.find((g) => g.key === "clock runs out" && g.connected === connected).id);
+  check("a connected player's clock running out ends the game", flagged(true)?.status === "outoftime", flagged(true)?.status ?? "not finished");
+  note("an API-only game is flagged", Boolean(flagged(false)));
+  save("timeouts", { games: games.map(({ streams, ...g }) => ({ ...g, moves: g.moves.length, ended: ended.get(g.id) ?? null })) });
+}
+
 /** Check 8: how much the API tolerates at 64-player scale, one request at a time. */
 async function rateLimits() {
   const { A, B, C } = await needAccounts("A", "B", "C");
@@ -395,6 +444,7 @@ const commands = {
   expiry,
   options,
   results,
+  timeouts,
   "rate-limits": rateLimits,
 };
 
