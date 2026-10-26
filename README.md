@@ -113,6 +113,22 @@ It stops at once if Lichess answers HTTP 429. Switch it on one of two ways:
 
 Even with neither, nothing is lost: a result is picked up when a player opens the match screen or a referee sets it.
 
+## Admins
+
+Admins are chosen by the super admin on the Organizer page, per tournament, and stop having access when the
+tournament ends (the super admin keeps it). Access is deny-by-default.
+
+- **Add an admin** by their Lichess username. The app checks the name exists on Lichess and uses Lichess's own
+  spelling. They start from the referee or the check-in desk ticks.
+- **Tick or untick** what each admin may do: results, no-shows and forfeits, the check-in desk, announcements, building
+  the bracket, changing the date and rules, reading the audit log. **Use referee ticks** and **Use desk ticks** put
+  someone back on a preset; **Remove admin** takes their access away at once.
+- **Only the super admin manages admins or ends the tournament.** That is not a tick: no one can be given it, and a
+  referee who has been ticked for everything else still cannot add an accomplice.
+- Every change is in the audit log with who made it and exactly what was switched on or off.
+- The super admin is whoever logs in with the `SUPER_ADMIN` username, so it is not an admin record and cannot be
+  removed from the app.
+
 ## Layout
 
 ```
@@ -169,7 +185,6 @@ These fill gaps in the brief. Each is one constant or one line, so they are chea
   organizer can see the round, the public cannot yet), and the cut-off line and bubble.
 - **Creating the Swiss from the app.** It is created on Lichess by hand for now.
 - **Round control:** starting rounds, matches waiting or flagged.
-- **Admin management:** adding admins and ticking their permissions. The roles and checks exist; there is no screen.
 - **Rating snapshot** when sign-ups close, the two-admin edit warning, and data deletion requests.
 - **Phase 2:** the standings image, round announcement text, and push notifications.
 - **The rules, fair-play and consent wording** (the brief lists it as open). The sign-up checkbox is a placeholder.
