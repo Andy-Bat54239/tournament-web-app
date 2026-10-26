@@ -15,6 +15,9 @@ const USERNAME = /^[A-Za-z0-9_-]{2,30}$/;
 
 export type SimulatedEvent = "join" | "white" | "black" | "draw" | "abort";
 
+/** The simulated Swiss has this many rounds. */
+export const SIMULATED_ROUNDS = 6;
+
 interface MockLink {
   request: LinkRequest;
   open: boolean;
@@ -29,6 +32,8 @@ export class MockLichess implements LichessClient {
   private readonly links = new Map<string, MockLink>();
   private readonly games = new Map<string, LichessGame>();
   private counter = 0;
+  /** The round the simulated Swiss is in: 0 not started, 1 to 6 being played, null finished. */
+  private swissRound: number | null = null;
 
   async getProfile(username: string): Promise<LichessProfile | null> {
     if (!USERNAME.test(username)) return null;
@@ -48,17 +53,39 @@ export class MockLichess implements LichessClient {
     swissId: string | null;
     entrants: string[];
   }): Promise<StandingRow[]> {
+    // The final points, scaled to the rounds played so far. The round being played is not in the points yet.
+    const played = this.swissRound === null ? SIMULATED_ROUNDS : Math.max(this.swissRound - 1, 0);
     const scored = entrants.map((username) => {
       const h = hash(username);
-      return { username, points: ((h >>> 3) % 11) / 2, tiebreak: h };
+      const final = ((h >>> 3) % 11) / 2;
+      return { username, points: Math.round(((final * played) / SIMULATED_ROUNDS) * 2) / 2, tiebreak: h };
     });
     scored.sort((a, b) => b.points - a.points || b.tiebreak - a.tiebreak);
     return scored.map(({ username, points }, i) => ({ rank: i + 1, username, points }));
   }
 
-  /** Any id is a Swiss that has just finished, so the whole flow can be tried without Lichess. */
+  /** Any id is a Swiss, finished unless `simulateSwiss` says otherwise, so the whole flow can be tried without Lichess. */
   async getSwiss(swissId: string): Promise<SwissInfo | null> {
-    return { id: swissId, name: "Simulated Swiss", status: "finished", round: 6, rounds: 6, players: 36, ongoing: 0 };
+    const round = this.swissRound;
+    if (round === null) {
+      return { id: swissId, name: "Simulated Swiss", status: "finished", round: SIMULATED_ROUNDS, rounds: SIMULATED_ROUNDS, players: 36, ongoing: 0 };
+    }
+    return {
+      id: swissId,
+      name: "Simulated Swiss",
+      status: round === 0 ? "created" : "started",
+      round,
+      rounds: SIMULATED_ROUNDS,
+      players: 36,
+      ongoing: round === 0 ? 0 : 3,
+    };
+  }
+
+  /** Development only: move the simulated Swiss along. 0 is not started, 1 to 6 is that round being played, null is finished. */
+  simulateSwiss(round: number | null): boolean {
+    if (round !== null && (!Number.isInteger(round) || round < 0 || round > SIMULATED_ROUNDS)) return false;
+    this.swissRound = round;
+    return true;
   }
 
   async createGameLink(request: LinkRequest): Promise<GameLink> {

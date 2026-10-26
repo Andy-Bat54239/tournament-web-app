@@ -75,3 +75,59 @@ describe("MockLichess profiles", () => {
     expect(await lichess.getProfile("not a name!")).toBeNull();
   });
 });
+
+describe("the simulated Swiss", () => {
+  const names = Array.from({ length: 24 }, (_, i) => `Player_${i + 1}`);
+
+  it("is finished unless told otherwise", async () => {
+    const mock = new MockLichess();
+    expect(await mock.getSwiss("AbCdEfGh")).toMatchObject({ status: "finished", round: 6, rounds: 6, ongoing: 0 });
+  });
+
+  it("can be moved along, from not started to finished", async () => {
+    const mock = new MockLichess();
+    expect(mock.simulateSwiss(0)).toBe(true);
+    expect(await mock.getSwiss("AbCdEfGh")).toMatchObject({ status: "created", round: 0 });
+    expect(mock.simulateSwiss(3)).toBe(true);
+    expect(await mock.getSwiss("AbCdEfGh")).toMatchObject({ status: "started", round: 3, ongoing: 3 });
+    expect(mock.simulateSwiss(null)).toBe(true);
+    expect(await mock.getSwiss("AbCdEfGh")).toMatchObject({ status: "finished" });
+  });
+
+  it("refuses a round that does not exist", () => {
+    const mock = new MockLichess();
+    expect(mock.simulateSwiss(7)).toBe(false);
+    expect(mock.simulateSwiss(-1)).toBe(false);
+    expect(mock.simulateSwiss(2.5)).toBe(false);
+  });
+
+  it("has everyone on nothing before the first round, and the round being played not counted", async () => {
+    const mock = new MockLichess();
+    mock.simulateSwiss(1);
+    const standings = await mock.getSwissStandings({ swissId: null, entrants: names });
+    expect(standings.every((s) => s.points === 0)).toBe(true);
+  });
+
+  it("gives more points as the rounds go, ending where the finished standings are", async () => {
+    const mock = new MockLichess();
+    const total = async () => (await mock.getSwissStandings({ swissId: null, entrants: names })).reduce((sum, s) => sum + s.points, 0);
+    const totals: number[] = [];
+    for (const round of [1, 3, 5, 6]) {
+      mock.simulateSwiss(round);
+      totals.push(await total());
+    }
+    mock.simulateSwiss(null);
+    totals.push(await total());
+    expect(totals).toEqual([...totals].sort((a, b) => a - b));
+    expect(totals[0]).toBe(0);
+    expect(totals[4]).toBeGreaterThan(totals[3]);
+  });
+
+  it("ranks from 1 with the most points first, whatever the round", async () => {
+    const mock = new MockLichess();
+    mock.simulateSwiss(4);
+    const standings = await mock.getSwissStandings({ swissId: null, entrants: names });
+    expect(standings.map((s) => s.rank)).toEqual(names.map((_, i) => i + 1));
+    expect(standings.map((s) => s.points)).toEqual([...standings.map((s) => s.points)].sort((a, b) => b - a));
+  });
+});
