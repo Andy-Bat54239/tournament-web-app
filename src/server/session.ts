@@ -9,7 +9,7 @@ import type { LoginFlow } from "./oauth";
  * secret) for ten minutes, and is only sent to the login routes.
  */
 
-const COOKIE = "cc_session";
+export const SESSION_COOKIE = "cc_session";
 export const FLOW_COOKIE = "cc_oauth";
 const MAX_AGE_SECONDS = 12 * 60 * 60;
 const FLOW_MAX_AGE_SECONDS = 10 * 60;
@@ -81,14 +81,14 @@ export const sessionCookieOptions = () => ({ ...base(), path: "/", maxAge: MAX_A
 export const flowCookieOptions = () => ({ ...base(), path: "/api/auth/lichess", maxAge: FLOW_MAX_AGE_SECONDS });
 
 export async function setSession(username: string): Promise<void> {
-  (await cookies()).set(COOKIE, encodeSession(username, Date.now()), sessionCookieOptions());
+  (await cookies()).set(SESSION_COOKIE, encodeSession(username, Date.now()), sessionCookieOptions());
 }
 
 export async function clearSession(): Promise<void> {
-  (await cookies()).delete(COOKIE);
+  (await cookies()).delete(SESSION_COOKIE);
 }
 
 /** The logged-in Lichess username, or null. Reads cookies, so call it behind <Suspense>. */
 export async function getSessionUsername(): Promise<string | null> {
-  return decodeSession((await cookies()).get(COOKIE)?.value, Date.now());
+  return decodeSession((await cookies()).get(SESSION_COOKIE)?.value, Date.now());
 }
