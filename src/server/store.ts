@@ -79,6 +79,8 @@ export interface TournamentState {
   status: "open" | "ended";
   scheduleChange: ScheduleChange | null;
   announcement: { text: string; sentAt: string | null } | null;
+  /** The Lichess Swiss the knockout is seeded from. Set by an organizer; the final ranks are read from it. */
+  swissId: string | null;
   swiss: StandingRow[] | null;
   qualifiers: Qualifier[] | null;
   bracket: Bracket | null;
@@ -138,7 +140,12 @@ export class Store {
   /** A working copy of saved state. Fields added since it was saved get their starting value. */
   static fromState(state: PersistedState, superAdmin: string | null): Store {
     return new Store({
-      tournament: { ...state.tournament, records: state.tournament.records ?? {}, play: state.tournament.play ?? {} },
+      tournament: {
+        ...state.tournament,
+        swissId: state.tournament.swissId ?? null,
+        records: state.tournament.records ?? {},
+        play: state.tournament.play ?? {},
+      },
       registrations: state.registrations,
       admins: state.admins,
       audit: state.audit,
@@ -304,6 +311,18 @@ export class Store {
     if (!announcement) return fail("There is no announcement to send.");
     announcement.sentAt = now.toISOString();
     this.log(actor, now, "Confirmed the schedule announcement was sent to the community chat.");
+    return ok;
+  }
+
+  /** Chooses the Lichess Swiss to seed the knockout from. Lichess has already been asked that it exists. */
+  setSwiss(actor: string, swissId: string, now: Date): Result<object> {
+    const denied = this.deny(actor, "rounds");
+    if (denied) return denied;
+    if (this.tournament.bracket) return fail("The bracket is already built. Reset it first to use a different Swiss.");
+    if (!/^[A-Za-z0-9]{8}$/.test(swissId)) return fail("That is not a Lichess Swiss id.");
+    if (this.tournament.swissId === swissId) return ok;
+    this.tournament.swissId = swissId;
+    this.log(actor, now, `Chose the Lichess Swiss https://lichess.org/swiss/${swissId} to seed the knockout from.`);
     return ok;
   }
 

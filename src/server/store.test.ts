@@ -42,6 +42,7 @@ function makeStore(players = 0, cap = 64): Store {
       status: "open",
       scheduleChange: null,
       announcement: null,
+      swissId: null,
       swiss: null,
       qualifiers: null,
       bracket: null,
@@ -403,3 +404,32 @@ describe("saving and loading the state", () => {
     expect(loaded.tournament.records).toEqual({});
   });
 });
+
+describe("choosing the Swiss", () => {
+  it("is for those who run the rounds, and is written to the audit log", () => {
+    const store = makeStore(20);
+    expect(store.setSwiss("Dan", "FgUapYId", LATE).ok).toBe(false);
+    expect(store.setSwiss("Ruth", "FgUapYId", LATE).ok).toBe(false);
+    expect(store.tournament.swissId).toBeNull();
+    expect(store.setSwiss("Joel", "FgUapYId", LATE)).toEqual({ ok: true });
+    expect(store.tournament.swissId).toBe("FgUapYId");
+    expect(store.audit.at(-1)).toMatchObject({ actor: "Joel", action: expect.stringContaining("lichess.org/swiss/FgUapYId") });
+  });
+
+  it("only takes a Swiss id, and can be changed until the bracket exists", () => {
+    const store = makeStore(20);
+    expect(store.setSwiss("Joel", "short", LATE).ok).toBe(false);
+    expect(store.setSwiss("Joel", "FgUapYId", LATE).ok).toBe(true);
+    expect(store.setSwiss("Joel", "AbCdEfGh", LATE).ok).toBe(true);
+    expect(store.tournament.swissId).toBe("AbCdEfGh");
+    const log = store.audit.length;
+    expect(store.setSwiss("Joel", "AbCdEfGh", LATE).ok).toBe(true);
+    expect(store.audit).toHaveLength(log); // choosing the same one again logs nothing
+  });
+
+  it("is refused once the bracket is built", () => {
+    const w = setup();
+    expect(w.store.setSwiss("Joel", "FgUapYId", at(5))).toMatchObject({ ok: false, error: expect.stringContaining("already built") });
+  });
+});
+

@@ -40,6 +40,7 @@ export function setup() {
       status: "open",
       scheduleChange: null,
       announcement: null,
+      swissId: null,
       swiss: null,
       qualifiers: null,
       bracket: null,
