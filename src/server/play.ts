@@ -106,6 +106,13 @@ export class MatchPlayService {
     return null;
   }
 
+  /** The matches with a game link out, which is where a result can turn up without anyone looking. */
+  watching(): string[] {
+    return Object.entries(this.state)
+      .filter(([, play]) => play.round?.link)
+      .map(([matchId]) => matchId);
+  }
+
   /** Links nobody should use any more. The caller closes them on Lichess, then they are forgotten. */
   takeCancels(): string[] {
     const taken = this.pendingCancels;
