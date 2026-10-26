@@ -13,7 +13,20 @@ import {
 } from "@/domain/knockout";
 import type { GameOutcome } from "@/domain/match";
 import type { MatchPlay } from "@/domain/play";
-import { can, type AdminAccess, type Permission, type Preset } from "@/domain/permissions";
+import {
+  GRANTABLE,
+  PERMISSION_LABELS,
+  PRESETS,
+  can,
+  grantChanges,
+  isPermission,
+  isPreset,
+  presetOf,
+  sortedGrants,
+  type AdminAccess,
+  type Permission,
+  type Preset,
+} from "@/domain/permissions";
 import { normalizeUgandaPhone } from "@/domain/phone";
 import {
   checkIn,
@@ -485,6 +498,74 @@ export class Store {
     if (this.tournament.status === "ended") return fail("The tournament has already ended.");
     this.tournament.status = "ended";
     this.log(actor, now, "Ended the tournament. Admin access has expired.");
+    return ok;
+  }
+
+  // Admins. Only the super admin manages them, whatever anyone else has been ticked for, so nobody can hand
+  // themselves more access by ticking it, and a stolen referee login cannot add accomplices.
+
+  private superAdminOnly(actor: string) {
+    if (!this.access(actor)?.superAdmin) return fail(FORBIDDEN);
+    if (this.tournament.status === "ended") return fail("The tournament has ended, so admin access has expired.");
+    return null;
+  }
+
+  private adminNamed(username: string) {
+    return this.admins.find((a) => sameUser(a.username, username));
+  }
+
+  private labels(grants: readonly Permission[]) {
+    return grants.length === 0 ? "nothing" : grants.map((g) => PERMISSION_LABELS[g].toLowerCase()).join(", ");
+  }
+
+  /** Makes someone an admin, starting from a preset. `username` should be as Lichess spells it. */
+  addAdmin(actor: string, username: string, preset: string, now: Date): Result<object> {
+    const denied = this.superAdminOnly(actor);
+    if (denied) return denied;
+    if (!/^[A-Za-z0-9_-]{2,30}$/.test(username)) return fail("Enter a Lichess username: letters, numbers, _ or -.");
+    if (!isPreset(preset)) return fail("Choose a starting role: referee or desk.");
+    if (this.superAdmin && sameUser(username, this.superAdmin)) return fail(`${username} is the super admin already.`);
+    if (this.adminNamed(username)) return fail(`${username} is an admin already. Change their ticks below.`);
+
+    const grants = sortedGrants(PRESETS[preset]);
+    this.admins.push({ username, preset, grants });
+    this.log(actor, now, `Added ${username} as an admin (${preset}): ${this.labels(grants)}.`);
+    return ok;
+  }
+
+  /** Sets exactly what an admin may do. Anything not in `grants` is switched off. */
+  setAdminAccess(actor: string, username: string, grants: readonly string[], now: Date): Result<object> {
+    const denied = this.superAdminOnly(actor);
+    if (denied) return denied;
+    const admin = this.adminNamed(username);
+    if (!admin) return fail("That person is not an admin.");
+    const wanted = grants.filter(isPermission);
+    if (wanted.length !== grants.length) return fail("Those permissions are not recognised.");
+    if (wanted.some((g) => !GRANTABLE.includes(g))) return fail("Only the super admin can manage admins or end the tournament.");
+
+    const next = sortedGrants(wanted);
+    const { added, removed } = grantChanges(admin.grants, next);
+    if (added.length === 0 && removed.length === 0) return ok;
+    admin.grants = next;
+    admin.preset = presetOf(next);
+    const parts = [added.length ? `switched on ${this.labels(added)}` : "", removed.length ? `switched off ${this.labels(removed)}` : ""];
+    this.log(actor, now, `Changed ${admin.username}'s access: ${parts.filter(Boolean).join("; ")}.`);
+    return ok;
+  }
+
+  /** Puts an admin back on a starting role's ticks, whatever they had. */
+  applyAdminPreset(actor: string, username: string, preset: string, now: Date): Result<object> {
+    if (!isPreset(preset)) return fail("Choose a starting role: referee or desk.");
+    return this.setAdminAccess(actor, username, PRESETS[preset], now);
+  }
+
+  removeAdmin(actor: string, username: string, now: Date): Result<object> {
+    const denied = this.superAdminOnly(actor);
+    if (denied) return denied;
+    const admin = this.adminNamed(username);
+    if (!admin) return fail("That person is not an admin.");
+    this.admins = this.admins.filter((a) => a !== admin);
+    this.log(actor, now, `Removed ${admin.username} as an admin.`);
     return ok;
   }
 

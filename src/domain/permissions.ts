@@ -61,7 +61,7 @@ export function can(
  * What the super admin can tick for another admin. "admins" is left out on purpose: adding admins and ending the
  * tournament are the super admin's alone, whatever anyone else is ticked for (brief, section 4).
  */
-export const GRANTABLE = PERMISSIONS.filter((p) => p !== "admins");
+export const GRANTABLE: readonly Permission[] = PERMISSIONS.filter((p) => p !== "admins");
 
 export function isPermission(value: unknown): value is Permission {
   return typeof value === "string" && (PERMISSIONS as readonly string[]).includes(value);
