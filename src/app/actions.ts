@@ -2,15 +2,18 @@
 
 import { refresh } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
-import { field, type Result } from "@/domain/registration";
+import type { Result } from "@/domain/registration";
 import type { GameOutcome } from "@/domain/match";
 import type { FormState } from "@/lib/form-state";
+import { parseSwissId, swissProgress } from "@/domain/swiss";
 import { loginMode } from "@/server/auth-config";
 import { readStore, updateStore } from "@/server/instance";
 import { getLichess, getMockLichess } from "@/server/lichess";
+import { ask } from "@/server/lichess/ask";
 import type { SimulatedEvent } from "@/server/lichess/mock";
 import { StoreBusy } from "@/server/provider";
 import { clearSession, getSessionUsername, setSession } from "@/server/session";
+import { standingsFor } from "@/server/swiss";
 
 /**
  * Server Actions are public POST endpoints, so each one re-reads the session
@@ -185,6 +188,22 @@ export async function removeNoShows(): Promise<FormState> {
   });
 }
 
+/** Chooses the Lichess Swiss the knockout is seeded from. Takes its link, or just the id. */
+export async function setSwiss(_prev: FormState, data: FormData): Promise<FormState> {
+  return asUser(async (actor) => {
+    const id = parseSwissId(text(data, "swiss"));
+    if (!id) return { error: "Paste the Swiss link from Lichess, like https://lichess.org/swiss/AbCdEfGh." };
+    // Only an organizer may make Lichess calls from here.
+    if (!(await readStore()).can(actor, "rounds")) return { error: "You don’t have access to that." };
+    const found = await ask(() => getLichess().getSwiss(id));
+    if (!found.ok) return { error: found.error };
+    if (!found.value) return { error: "Lichess has no Swiss tournament with that id." };
+    const swiss = found.value;
+    const result = await updateStore((store) => store.setSwiss(actor, id, new Date()));
+    return finish(result, `Using “${swiss.name}”. ${swissProgress(swiss)}.`);
+  });
+}
+
 export async function buildBracket(_prev: FormState, data: FormData): Promise<FormState> {
   return asUser(async (actor) => {
     const raw = text(data, "qualifiers");
@@ -195,11 +214,9 @@ export async function buildBracket(_prev: FormState, data: FormData): Promise<Fo
     // Lichess is asked first, outside the update, because that call can be slow. Only an organizer may ask it.
     const current = await readStore();
     if (!current.can(actor, "rounds")) return { error: "You don’t have access to that." };
-    const standings = await getLichess().getSwissStandings({
-      swissId: null,
-      entrants: field(current.registrations).map((r) => r.username),
-    });
-    const result = await updateStore((store) => store.buildBracket(actor, standings, { qualifiers }, new Date()));
+    const found = await standingsFor(current, getLichess());
+    if (!found.ok) return { error: found.error };
+    const result = await updateStore((store) => store.buildBracket(actor, found.standings, { qualifiers }, new Date()));
     return result.ok ? finish(result, `Bracket built with ${result.qualifiers} qualifiers.`) : { error: result.error };
   });
 }
