@@ -1,0 +1,58 @@
+/**
+ * Organizer roles (brief, section 4). Access is deny-by-default: an admin can
+ * only do what the super admin has switched on for them, per tournament, and it
+ * all expires when the tournament ends.
+ */
+
+export const PERMISSIONS = [
+  "result", // set or override a result
+  "forfeit", // forfeit or remove a player during the event (no-shows)
+  "roster", // check players in, add or remove before the start
+  "announce", // post announcements and share images
+  "rounds", // start rounds and build the bracket
+  "settings", // change cap, timers, rules, or the tournament date and time
+  "admins", // add admins, cancel the tournament
+  "audit", // read the audit log
+] as const;
+
+export type Permission = (typeof PERMISSIONS)[number];
+
+/** Starting presets; each can be adjusted tick by tick. */
+export const PRESETS = {
+  referee: ["result", "forfeit", "announce"],
+  desk: ["roster", "announce"],
+} as const satisfies Record<string, readonly Permission[]>;
+
+export type Preset = keyof typeof PRESETS;
+
+export const PERMISSION_LABELS: Record<Permission, string> = {
+  result: "Set or override results",
+  forfeit: "Record no-shows and forfeits",
+  roster: "Run the check-in desk",
+  announce: "Post announcements",
+  rounds: "Build the bracket",
+  settings: "Change date, time and rules",
+  admins: "Manage admins",
+  audit: "Read the audit log",
+};
+
+export interface AdminAccess {
+  username: string;
+  superAdmin: boolean;
+  grants: readonly Permission[];
+}
+
+/**
+ * The super admin keeps full control, including after the tournament ends (the
+ * fair-play review runs for 24 hours afterwards). Everyone else loses access
+ * when it ends.
+ */
+export function can(
+  access: AdminAccess | null | undefined,
+  permission: Permission,
+  tournamentEnded: boolean,
+): boolean {
+  if (!access) return false;
+  if (access.superAdmin) return true;
+  return !tournamentEnded && access.grants.includes(permission);
+}
