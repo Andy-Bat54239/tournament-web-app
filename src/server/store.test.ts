@@ -3,6 +3,7 @@ import { PRESETS } from "@/domain/permissions";
 import type { Registration } from "@/domain/registration";
 import { MockLichess } from "./lichess/mock";
 import type { StandingRow } from "./lichess/types";
+import { at, setup } from "@/test/fixtures";
 import { Store } from "./store";
 
 const eat = (date: string, time: string) => new Date(`${date}T${time}:00+03:00`);
@@ -373,5 +374,32 @@ describe("roles", () => {
   it("has no super admin when none is configured", () => {
     const store = new Store({ ...{ superAdmin: null }, tournament: makeStore().tournament });
     expect(store.access("Joel")).toBeNull();
+  });
+});
+
+describe("saving and loading the state", () => {
+  it("comes back the same after a trip through JSON, which is what Postgres does", async () => {
+    const w = setup();
+    w.store.play.markReady("P01", at(10));
+    await w.store.play.ensureLink("P01", w.lichess, at(11));
+    w.store.recordGame("Ruth", "r1m2", "hi", "Lichess was down", at(20));
+
+    const saved = JSON.parse(JSON.stringify(w.store.snapshot()));
+    const loaded = Store.fromState(saved, "Joel");
+
+    expect(loaded.snapshot()).toEqual(w.store.snapshot());
+    expect(loaded.resolved()!.matches.r1m2).toMatchObject({ status: "in_progress" });
+    expect(loaded.play.openMatchOf("P01")?.round.ready.hi).toBeDefined();
+    expect(loaded.can("Ruth", "result")).toBe(true);
+  });
+
+  it("gives fields that older saved state lacks their starting value", () => {
+    const w = setup();
+    const old = JSON.parse(JSON.stringify(w.store.snapshot()));
+    delete old.tournament.play;
+    delete old.tournament.records;
+    const loaded = Store.fromState(old, "Joel");
+    expect(loaded.tournament.play).toEqual({});
+    expect(loaded.tournament.records).toEqual({});
   });
 });

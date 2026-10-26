@@ -87,10 +87,19 @@ export interface TournamentState {
   play: Record<string, MatchPlay>;
 }
 
+/** Everything that is kept between requests and restarts. Plain JSON: it is stored as one Postgres document. */
+export interface PersistedState {
+  tournament: TournamentState;
+  registrations: Registration[];
+  admins: AdminRecord[];
+  audit: AuditEntry[];
+}
+
 export interface StoreConfig {
   tournament: TournamentState;
   registrations?: Registration[];
   admins?: AdminRecord[];
+  audit?: AuditEntry[];
   /** Lichess username of the super admin (Joel). */
   superAdmin: string | null;
 }
@@ -104,14 +113,15 @@ const FORBIDDEN = "You don’t have access to that.";
  * the actor's permission here, so the rule lives in one place and cannot be
  * skipped by a forgotten check in a page or form.
  *
- * This is an in-memory store: state is lost when the server restarts. It is a
- * stand-in for Postgres, kept behind this class so the swap stays local.
+ * A Store is one working copy of the state. It is built from what Postgres holds
+ * (see StoreProvider), changed by these methods, and saved back as a whole, so
+ * nothing in here touches the database.
  */
 export class Store {
   tournament: TournamentState;
   registrations: Registration[];
   admins: AdminRecord[];
-  audit: AuditEntry[] = [];
+  audit: AuditEntry[];
   /** Playing the matches: waiting windows, links, reading results, claims and problem reports. */
   readonly play: MatchPlayService;
   private readonly superAdmin: string | null;
@@ -121,7 +131,29 @@ export class Store {
     this.tournament = config.tournament;
     this.registrations = config.registrations ?? [];
     this.admins = config.admins ?? [];
+    this.audit = config.audit ?? [];
     this.superAdmin = config.superAdmin;
+  }
+
+  /** A working copy of saved state. Fields added since it was saved get their starting value. */
+  static fromState(state: PersistedState, superAdmin: string | null): Store {
+    return new Store({
+      tournament: { ...state.tournament, records: state.tournament.records ?? {}, play: state.tournament.play ?? {} },
+      registrations: state.registrations,
+      admins: state.admins,
+      audit: state.audit,
+      superAdmin,
+    });
+  }
+
+  /** What to save. These are the live objects, not copies, so save it before changing anything else. */
+  snapshot(): PersistedState {
+    return {
+      tournament: this.tournament,
+      registrations: this.registrations,
+      admins: this.admins,
+      audit: this.audit,
+    };
   }
 
   // Reading
