@@ -1,4 +1,4 @@
-import type { GameLink, LichessClient, LichessGame, LichessProfile, LinkRequest, StandingRow } from "./types";
+import type { GameLink, LichessClient, LichessGame, LichessProfile, LinkRequest, StandingRow, SwissInfo } from "./types";
 
 /** FNV-1a: a small stable hash, so the same username always gets the same fake data. */
 function hash(text: string): number {
@@ -25,6 +25,7 @@ interface MockLink {
  * `simulate` plays the part of the two players so every state of the match screen can be reached by hand.
  */
 export class MockLichess implements LichessClient {
+  readonly live = false;
   private readonly links = new Map<string, MockLink>();
   private readonly games = new Map<string, LichessGame>();
   private counter = 0;
@@ -53,6 +54,11 @@ export class MockLichess implements LichessClient {
     });
     scored.sort((a, b) => b.points - a.points || b.tiebreak - a.tiebreak);
     return scored.map(({ username, points }, i) => ({ rank: i + 1, username, points }));
+  }
+
+  /** Any id is a Swiss that has just finished, so the whole flow can be tried without Lichess. */
+  async getSwiss(swissId: string): Promise<SwissInfo | null> {
+    return { id: swissId, name: "Simulated Swiss", status: "finished", round: 6, rounds: 6, players: 36, ongoing: 0 };
   }
 
   async createGameLink(request: LinkRequest): Promise<GameLink> {

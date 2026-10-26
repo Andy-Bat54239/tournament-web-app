@@ -7,6 +7,7 @@ import {
   type LichessProfile,
   type LinkRequest,
   type StandingRow,
+  type SwissInfo,
 } from "./types";
 
 interface Reply {
@@ -30,6 +31,7 @@ export interface HttpLichessOptions {
  * here: Lichess says to wait at least a minute.
  */
 export class HttpLichess implements LichessClient {
+  readonly live = true;
   private readonly token: string;
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
@@ -96,6 +98,27 @@ export class HttpLichess implements LichessClient {
       .filter(Boolean)
       .map((line) => JSON.parse(line) as { rank: number; username: string; points: number })
       .map(({ rank, username, points }) => ({ rank, username, points }));
+  }
+
+  async getSwiss(swissId: string): Promise<SwissInfo | null> {
+    const res = await this.request("GET", `/api/swiss/${encodeURIComponent(swissId)}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new LichessError(`Could not read the Swiss tournament (HTTP ${res.status}).`);
+    const swiss = res.json as
+      | { id?: string; name?: string; status?: string; round?: number; nbRounds?: number; nbPlayers?: number; nbOngoing?: number }
+      | undefined;
+    if (!swiss?.id || (swiss.status !== "created" && swiss.status !== "started" && swiss.status !== "finished")) {
+      throw new LichessError("Lichess answered, but not with a Swiss tournament.");
+    }
+    return {
+      id: swiss.id,
+      name: swiss.name ?? swiss.id,
+      status: swiss.status,
+      round: swiss.round ?? 0,
+      rounds: swiss.nbRounds ?? 0,
+      players: swiss.nbPlayers ?? 0,
+      ongoing: swiss.nbOngoing ?? 0,
+    };
   }
 
   async createGameLink(request: LinkRequest): Promise<GameLink> {

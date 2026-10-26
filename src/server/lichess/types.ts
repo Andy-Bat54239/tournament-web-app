@@ -18,6 +18,21 @@ export interface StandingRow {
   points: number;
 }
 
+/** Where a Swiss tournament has got to, as Lichess reports it. */
+export interface SwissInfo {
+  id: string;
+  name: string;
+  /** created: not started. started: rounds are being played. finished: every round is done, or it ended early. */
+  status: "created" | "started" | "finished";
+  /** The round being played, or the last one played. */
+  round: number;
+  /** The number of rounds. Lichess lowers it if the Swiss has to end early. */
+  rounds: number;
+  players: number;
+  /** Games still being played right now. */
+  ongoing: number;
+}
+
 /** A challenge only the two named players can join. */
 export interface LinkRequest {
   /** The player with White first: Lichess gives the first name listed White. */
@@ -49,6 +64,8 @@ export interface LichessGame {
 }
 
 export interface LichessClient {
+  /** True for the real Lichess, false for the stand-in that invents everything. */
+  readonly live: boolean;
   /** Null when no such Lichess account exists. */
   getProfile(username: string): Promise<LichessProfile | null>;
   /**
@@ -56,6 +73,8 @@ export interface LichessClient {
    * Lichess and ignores `entrants`; the mock invents standings for them.
    */
   getSwissStandings(input: { swissId: string | null; entrants: string[] }): Promise<StandingRow[]>;
+  /** How far the Swiss has got. Null when Lichess has no Swiss with that id. */
+  getSwiss(swissId: string): Promise<SwissInfo | null>;
 
   /** Creates a restricted open challenge. Anyone not named is refused (checked live). */
   createGameLink(request: LinkRequest): Promise<GameLink>;
