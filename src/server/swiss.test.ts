@@ -100,6 +100,23 @@ describe("the standings the bracket is built from", () => {
     expect(await standingsFor(w.store, new FakeLive(info(), rows, true))).toMatchObject({ ok: false, error: expect.stringContaining("Lichess did not answer") });
   });
 
+  it("does not build a bracket from a Swiss none of the players entered", async () => {
+    const w = swissWorld();
+    w.store.tournament.swissId = "FgUapYId";
+    const strangers: StandingRow[] = [{ rank: 1, username: "someone-else", points: 2 }];
+    expect(await standingsFor(w.store, new FakeLive(info(), strangers))).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("None of the checked-in players"),
+    });
+  });
+
+  it("matches players to the Swiss whatever the capitals", async () => {
+    const w = swissWorld();
+    w.store.tournament.swissId = "FgUapYId";
+    const shouting: StandingRow[] = [{ rank: 1, username: "p05", points: 5 }];
+    expect(await standingsFor(w.store, new FakeLive(info(), shouting))).toEqual({ ok: true, standings: shouting });
+  });
+
   it("does not build a bracket from empty standings", async () => {
     const w = swissWorld();
     w.store.tournament.swissId = "FgUapYId";

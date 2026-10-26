@@ -36,5 +36,9 @@ export async function standingsFor(store: Store, lichess: LichessClient): Promis
   const standings = await ask(() => lichess.getSwissStandings({ swissId, entrants: players.map((p) => p.username) }));
   if (!standings.ok) return standings;
   if (standings.value.length === 0) return fail("Lichess returned no standings for that Swiss.");
+  const entered = new Set(standings.value.map((s) => s.username.toLowerCase()));
+  if (!players.some((p) => entered.has(p.username.toLowerCase()))) {
+    return fail("None of the checked-in players are in that Swiss. Check that you chose the right one.");
+  }
   return { ok: true, standings: standings.value };
 }
