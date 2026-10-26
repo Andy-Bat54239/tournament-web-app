@@ -433,3 +433,105 @@ describe("choosing the Swiss", () => {
   });
 });
 
+describe("managing admins", () => {
+  const sameAs = (store: Store) => store.admins.map((a) => `${a.username}:${a.preset}`);
+
+  it("is for the super admin alone, whatever anyone else is ticked for", () => {
+    const store = makeStore(0);
+    // Ruth is made as trusted as can be, short of what is not tickable.
+    store.admins.find((a) => a.username === "Ruth")!.grants = ["result", "forfeit", "roster", "announce", "rounds", "settings", "audit", "admins"];
+    for (const actor of ["Ruth", "Dan", "Stranger"]) {
+      expect(store.addAdmin(actor, "Mercy_K", "referee", LATE).ok, actor).toBe(false);
+      expect(store.setAdminAccess(actor, "Dan", ["result"], LATE).ok, actor).toBe(false);
+      expect(store.applyAdminPreset(actor, "Dan", "referee", LATE).ok, actor).toBe(false);
+      expect(store.removeAdmin(actor, "Dan", LATE).ok, actor).toBe(false);
+    }
+    expect(sameAs(store)).toEqual(["Ruth:referee", "Dan:desk"]);
+    expect(store.admins[1].grants).toEqual(["roster", "announce"]);
+    expect(store.audit).toHaveLength(0);
+  });
+
+  it("adds an admin from a preset, in the audit log, and they can use exactly that access", () => {
+    const store = makeStore(0);
+    expect(store.addAdmin("Joel", "Mercy_K", "referee", LATE)).toEqual({ ok: true });
+    expect(store.access("mercy_k")).toMatchObject({ username: "Mercy_K", superAdmin: false, grants: ["result", "forfeit", "announce"] });
+    expect(store.can("Mercy_K", "result")).toBe(true);
+    expect(store.can("Mercy_K", "rounds")).toBe(false);
+    expect(store.audit.at(-1)).toMatchObject({ actor: "Joel", action: expect.stringContaining("Added Mercy_K as an admin (referee)") });
+  });
+
+  it("checks who and what it is adding", () => {
+    const store = makeStore(0);
+    expect(store.addAdmin("Joel", "x", "referee", LATE).ok).toBe(false);
+    expect(store.addAdmin("Joel", "has space", "referee", LATE).ok).toBe(false);
+    expect(store.addAdmin("Joel", "Mercy_K", "superadmin", LATE).ok).toBe(false);
+    expect(store.addAdmin("Joel", "Mercy_K", "toString", LATE).ok).toBe(false);
+    expect(store.addAdmin("Joel", "joel", "desk", LATE)).toMatchObject({ ok: false, error: expect.stringContaining("super admin already") });
+    expect(store.addAdmin("Joel", "RUTH", "desk", LATE)).toMatchObject({ ok: false, error: expect.stringContaining("admin already") });
+    expect(store.admins).toHaveLength(2);
+  });
+
+  it("switches permissions on and off, says which in the log, and names the preset or calls it custom", () => {
+    const store = makeStore(0);
+    expect(store.setAdminAccess("Joel", "ruth", ["result", "forfeit", "announce", "rounds"], LATE)).toEqual({ ok: true });
+    expect(store.can("Ruth", "rounds")).toBe(true);
+    expect(store.admins.find((a) => a.username === "Ruth")).toMatchObject({ preset: null, grants: ["result", "forfeit", "announce", "rounds"] });
+    expect(store.audit.at(-1)?.action).toBe("Changed Ruth's access: switched on build the bracket.");
+
+    expect(store.setAdminAccess("Joel", "Ruth", ["result", "announce"], LATE).ok).toBe(true);
+    expect(store.audit.at(-1)?.action).toBe("Changed Ruth's access: switched off record no-shows and forfeits, build the bracket.");
+    expect(store.can("Ruth", "forfeit")).toBe(false);
+
+    expect(store.setAdminAccess("Joel", "Ruth", ["announce", "forfeit", "result"], LATE).ok).toBe(true);
+    expect(store.admins.find((a) => a.username === "Ruth")?.preset).toBe("referee");
+  });
+
+  it("logs nothing when nothing changes", () => {
+    const store = makeStore(0);
+    expect(store.setAdminAccess("Joel", "Ruth", ["announce", "result", "forfeit"], LATE)).toEqual({ ok: true });
+    expect(store.audit).toHaveLength(0);
+  });
+
+  it("can switch everything off, which leaves an admin with no access at all", () => {
+    const store = makeStore(0);
+    expect(store.setAdminAccess("Joel", "Dan", [], LATE).ok).toBe(true);
+    expect(store.can("Dan", "roster")).toBe(false);
+    expect(store.access("Dan")).toMatchObject({ grants: [] });
+  });
+
+  it("never lets anyone be ticked for managing admins, or for something that does not exist", () => {
+    const store = makeStore(0);
+    expect(store.setAdminAccess("Joel", "Ruth", ["result", "admins"], LATE)).toMatchObject({ ok: false, error: expect.stringContaining("Only the super admin") });
+    expect(store.setAdminAccess("Joel", "Ruth", ["result", "root"], LATE)).toMatchObject({ ok: false, error: expect.stringContaining("not recognised") });
+    expect(store.setAdminAccess("Joel", "Ruth", ["toString"], LATE).ok).toBe(false);
+    expect(store.can("Ruth", "admins")).toBe(false);
+    expect(store.audit).toHaveLength(0);
+  });
+
+  it("puts an admin back on a preset", () => {
+    const store = makeStore(0);
+    store.setAdminAccess("Joel", "Ruth", ["settings"], LATE);
+    expect(store.applyAdminPreset("Joel", "Ruth", "referee", LATE)).toEqual({ ok: true });
+    expect(store.admins.find((a) => a.username === "Ruth")).toMatchObject({ preset: "referee", grants: ["result", "forfeit", "announce"] });
+    expect(store.applyAdminPreset("Joel", "Ruth", "nonsense", LATE).ok).toBe(false);
+    expect(store.applyAdminPreset("Joel", "Nobody", "desk", LATE).ok).toBe(false);
+  });
+
+  it("removes an admin at once, and says so in the log", () => {
+    const store = makeStore(0);
+    expect(store.removeAdmin("Joel", "dan", LATE)).toEqual({ ok: true });
+    expect(store.access("Dan")).toBeNull();
+    expect(store.can("Dan", "roster")).toBe(false);
+    expect(store.audit.at(-1)?.action).toBe("Removed Dan as an admin.");
+    expect(store.removeAdmin("Joel", "Dan", LATE).ok).toBe(false);
+  });
+
+  it("is closed once the tournament has ended, when admin access has expired anyway", () => {
+    const store = makeStore(0);
+    store.endTournament("Joel", LATE);
+    expect(store.addAdmin("Joel", "Mercy_K", "referee", LATE)).toMatchObject({ ok: false, error: expect.stringContaining("has ended") });
+    expect(store.setAdminAccess("Joel", "Ruth", ["result"], LATE).ok).toBe(false);
+    expect(store.removeAdmin("Joel", "Ruth", LATE).ok).toBe(false);
+  });
+});
+
