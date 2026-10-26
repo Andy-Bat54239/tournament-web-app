@@ -33,6 +33,7 @@ import {
   field,
   findRegistration,
   joinTeam,
+  LICHESS_USERNAME,
   register,
   removeNoShows,
   sameUser,
@@ -522,7 +523,7 @@ export class Store {
   addAdmin(actor: string, username: string, preset: string, now: Date): Result<object> {
     const denied = this.superAdminOnly(actor);
     if (denied) return denied;
-    if (!/^[A-Za-z0-9_-]{2,30}$/.test(username)) return fail("Enter a Lichess username: letters, numbers, _ or -.");
+    if (!LICHESS_USERNAME.test(username)) return fail("Enter a Lichess username: letters, numbers, _ or -.");
     if (!isPreset(preset)) return fail("Choose a starting role: referee or desk.");
     if (this.superAdmin && sameUser(username, this.superAdmin)) return fail(`${username} is the super admin already.`);
     if (this.adminNamed(username)) return fail(`${username} is an admin already. Change their ticks below.`);

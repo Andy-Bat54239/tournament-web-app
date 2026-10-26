@@ -31,6 +31,9 @@ export type Result<T> = ({ ok: true } & T) | { ok: false; error: string };
 
 export const HARD_CAP = 64;
 
+/** What a Lichess username looks like: letters, numbers, _ and -. */
+export const LICHESS_USERNAME = /^[A-Za-z0-9_-]{2,30}$/;
+
 export function sameUser(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
