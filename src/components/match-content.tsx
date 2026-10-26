@@ -1,8 +1,8 @@
 import { connection } from "next/server";
-import { claimWin, getGameLink, markReady, reportProblem, simulateGame } from "@/app/actions";
+import { claimWin, getGameLink, logout, markReady, reportProblem, simulateGame } from "@/app/actions";
 import { getStore } from "@/server/instance";
 import { getMockLichess } from "@/server/lichess";
-import { matchScreen, type PlayView } from "@/server/match-screen";
+import { matchScreen, type MatchScreen, type PlayView } from "@/server/match-screen";
 import { getSessionUsername } from "@/server/session";
 import { ActionForm } from "./action-form";
 import { AutoSync } from "./auto-sync";
@@ -159,6 +159,20 @@ export async function MatchContent() {
   const store = getStore();
   const screen = matchScreen(store, username, now);
 
+  return (
+    <>
+      {screenFor(screen, store)}
+      <form action={logout} className="who">
+        <span>Logged in as {username}.</span>
+        <button type="submit" className="quiet">
+          Log out
+        </button>
+      </form>
+    </>
+  );
+}
+
+function screenFor(screen: MatchScreen, store: ReturnType<typeof getStore>) {
   switch (screen.kind) {
     case "no_bracket":
       return (
