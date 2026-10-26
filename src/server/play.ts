@@ -148,7 +148,8 @@ export class MatchPlayService {
    */
   sync(now: Date, ended?: { matchId: string; at: Date }) {
     const resolved = this.store.resolved();
-    if (!resolved) return;
+    // A bracket on hold has no waiting times running, so nobody can lose a match to a clock that has not started.
+    if (!resolved || this.store.tournament.knockoutHeld) return;
     for (const match of Object.values(resolved.matches)) {
       const open = match.status === "ready" || match.status === "in_progress";
       if (!open) {

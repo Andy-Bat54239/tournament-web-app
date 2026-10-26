@@ -41,6 +41,7 @@ export function setup() {
       scheduleChange: null,
       announcement: null,
       swissId: null,
+      knockoutHeld: false,
       swiss: null,
       qualifiers: null,
       bracket: null,

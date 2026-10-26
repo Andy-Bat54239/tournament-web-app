@@ -95,6 +95,11 @@ export interface TournamentState {
   announcement: { text: string; sentAt: string | null } | null;
   /** The Lichess Swiss the knockout is seeded from. Set by an organizer; the final ranks are read from it. */
   swissId: string | null;
+  /**
+   * The bracket is built but nobody may start playing yet: players see their match, no waiting time runs. For when
+   * the knockout is on a different day from the Swiss. An organizer starts it.
+   */
+  knockoutHeld: boolean;
   swiss: StandingRow[] | null;
   qualifiers: Qualifier[] | null;
   bracket: Bracket | null;
@@ -157,6 +162,7 @@ export class Store {
       tournament: {
         ...state.tournament,
         swissId: state.tournament.swissId ?? null,
+        knockoutHeld: state.tournament.knockoutHeld ?? false,
         records: state.tournament.records ?? {},
         play: state.tournament.play ?? {},
       },
@@ -343,7 +349,7 @@ export class Store {
   buildBracket(
     actor: string,
     standings: StandingRow[] | null,
-    opts: { qualifiers?: number },
+    opts: { qualifiers?: number; hold?: boolean },
     now: Date,
   ): Result<{ qualifiers: number }> {
     const denied = this.deny(actor, "rounds");
@@ -388,10 +394,29 @@ export class Store {
     this.tournament.qualifiers = ranked.slice(0, count);
     this.tournament.bracket = buildBracket(count);
     this.tournament.records = {};
+    this.tournament.knockoutHeld = opts.hold === true;
     this.play.reset();
     this.play.sync(now);
-    this.log(actor, now, `Built the bracket with ${count} qualifiers from ${ranked.length} players.`);
+    this.log(
+      actor,
+      now,
+      `Built the bracket with ${count} qualifiers from ${ranked.length} players` +
+        (opts.hold ? ", on hold until the knockout is started." : "."),
+    );
     return { ok: true, qualifiers: count };
+  }
+
+  /** Lets a bracket that was built on hold begin: every match that is ready gets its waiting time. */
+  startKnockout(actor: string, now: Date): Result<{ matches: number }> {
+    const denied = this.deny(actor, "rounds");
+    if (denied) return denied;
+    if (!this.tournament.bracket) return fail("There is no bracket to start.");
+    if (!this.tournament.knockoutHeld) return fail("The knockout has already started.");
+    this.tournament.knockoutHeld = false;
+    this.play.sync(now);
+    const matches = Object.values(this.tournament.play).filter((p) => p.round).length;
+    this.log(actor, now, `Started the knockout: ${matches} match${matches === 1 ? " is" : "es are"} open.`);
+    return { ok: true, matches };
   }
 
   resetBracket(actor: string, reason: string, now: Date): Result<object> {
@@ -403,6 +428,7 @@ export class Store {
     this.tournament.qualifiers = null;
     this.tournament.swiss = null;
     this.tournament.records = {};
+    this.tournament.knockoutHeld = false;
     this.play.reset();
     this.log(actor, now, "Reset the bracket and cleared every result.", reason.trim());
     return ok;

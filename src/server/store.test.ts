@@ -43,6 +43,7 @@ function makeStore(players = 0, cap = 64): Store {
       scheduleChange: null,
       announcement: null,
       swissId: null,
+      knockoutHeld: false,
       swiss: null,
       qualifiers: null,
       bracket: null,
