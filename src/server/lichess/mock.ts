@@ -25,7 +25,7 @@ interface MockLink {
  * `simulate` plays the part of the two players so every state of the match screen can be reached by hand.
  */
 export class MockLichess implements LichessClient {
-  readonly live = false;
+  readonly live: boolean = false;
   private readonly links = new Map<string, MockLink>();
   private readonly games = new Map<string, LichessGame>();
   private counter = 0;
