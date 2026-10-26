@@ -54,7 +54,8 @@ export interface GameRound {
 export interface ProblemReport {
   by: string;
   at: string;
-  game: number;
+  /** The game the player was on, or null when the match ended without one being played, such as by a no-show. */
+  game: number | null;
   text: string;
   /** Reported more than 5 minutes after the game ended. */
   late: boolean;

@@ -337,7 +337,7 @@ export class MatchPlayService {
     play.problems.push({
       by: username,
       at: now.toISOString(),
-      game: play.round?.game ?? games.length,
+      game: play.round?.game ?? (games.length > 0 ? games.length : null),
       text: body,
       late: isLate(lastEnded ? new Date(lastEnded) : null, now),
     });

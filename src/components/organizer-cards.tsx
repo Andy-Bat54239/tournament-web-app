@@ -176,8 +176,8 @@ export function RefereeCard({
         <ul className="log bare">
           {problems.slice(0, 10).map((problem) => (
             <li key={`${problem.matchId}-${problem.at}-${problem.by}`}>
-              <span className="when">{formatWhen(new Date(problem.at))}</span> · <b>{problem.by}</b> in {problem.title}, game{" "}
-              {problem.game}
+              <span className="when">{formatWhen(new Date(problem.at))}</span> · <b>{problem.by}</b> in {problem.title}
+              {problem.game === null ? "" : `, game ${problem.game}`}
               {problem.late ? " (reported late)" : ""}: {problem.text}
             </li>
           ))}

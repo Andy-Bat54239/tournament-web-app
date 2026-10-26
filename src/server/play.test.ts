@@ -308,6 +308,14 @@ describe("problems", () => {
     w.store.recordGame("Ruth", "r1m1", "hi", "x", at(60));
     w.store.recordGame("Ruth", "r1m1", "hi", "x", at(70));
     expect(w.store.play.reportProblem("P08", "I think I was disconnected", at(80)).ok).toBe(true);
+    expect(w.store.play.desk(at(90)).problems[0]).toMatchObject({ by: "P08", game: 2 });
+  });
+
+  it("carries no game number when the match ended without a game being played", () => {
+    const w = setup();
+    w.store.recordNoShow("Ruth", "r1m1", { hi: true, lo: false }, "P08 did not appear", at(60));
+    expect(w.store.play.reportProblem("P08", "My ready button did not respond", at(70)).ok).toBe(true);
+    expect(w.store.play.desk(at(80)).problems[0]).toMatchObject({ by: "P08", game: null });
   });
 
   it("need some words, not too many, and not endless", () => {
