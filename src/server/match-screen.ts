@@ -34,6 +34,8 @@ export type MatchScreen =
   | { kind: "no_bracket" }
   | { kind: "not_qualified" }
   | { kind: "waiting"; title: string; name: string; seed: number }
+  /** Both players are known, but the organizers have the knockout on hold. */
+  | { kind: "held"; title: string; name: string; seed: number; opponent: { name: string; seed: number } }
   | { kind: "out"; title: string; winnerName: string | null; how: string }
   | { kind: "champion"; name: string }
   | ({ kind: "play" } & PlayView);
@@ -67,7 +69,14 @@ export function matchScreen(store: Store, username: string, now: Date): MatchScr
   }
 
   const mine = store.play.openMatchOf(username);
-  if (!mine) return { kind: "waiting", title: latest.title, name, seed };
+  if (!mine) {
+    const known = latest.hi !== null && latest.lo !== null;
+    if (store.tournament.knockoutHeld && known && (latest.status === "ready" || latest.status === "in_progress")) {
+      const other = latest.hi === seed ? latest.lo! : latest.hi!;
+      return { kind: "held", title: latest.title, name, seed, opponent: { name: store.play.name(other), seed: other } };
+    }
+    return { kind: "waiting", title: latest.title, name, seed };
+  }
 
   const { match, side, round } = mine;
   const other = opponentOf(side);

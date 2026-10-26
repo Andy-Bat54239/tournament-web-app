@@ -202,6 +202,19 @@ function screenFor(screen: MatchScreen, store: Store) {
           <AutoSync everyMs={10_000} />
         </>
       );
+    case "held":
+      return (
+        <>
+          <div className="card">
+            <p className="strong">Your {screen.title} is against {screen.opponent.name}.</p>
+            <p className="note">
+              The knockout has not started yet. The organizers will open it, and then you can tap I’m ready here. Your
+              waiting time only starts then.
+            </p>
+          </div>
+          <AutoSync everyMs={10_000} />
+        </>
+      );
     case "out":
       return (
         <>
