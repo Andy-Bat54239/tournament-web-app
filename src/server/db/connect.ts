@@ -1,4 +1,5 @@
 import "server-only";
+import { mkdir } from "node:fs/promises";
 import { pgSql, pgliteSql, type Sql } from "./sql";
 
 /**
@@ -25,6 +26,8 @@ export async function openPostgres(url: string): Promise<Sql> {
 
 export async function openPglite(dir?: string): Promise<Sql> {
   const { PGlite } = await import("@electric-sql/pglite");
+  // PGlite makes its folder but not the folders above it, so a fresh checkout has no .data yet.
+  if (dir) await mkdir(dir, { recursive: true });
   const db = new PGlite(dir);
   await db.waitReady;
   return pgliteSql(db);
