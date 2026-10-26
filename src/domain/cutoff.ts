@@ -96,6 +96,18 @@ export function cutOff(
   };
 }
 
+/** Rows that fit one column of standings on a wide screen without scrolling, with room for the heading above. */
+export const ROWS_PER_COLUMN = 16;
+const MAX_COLUMNS = 4;
+
+/**
+ * How many columns a table of this many rows is split into where there is width to spare, so 64 players show
+ * as four short columns instead of one long one. A short table stays in one column.
+ */
+export function standingsColumns(rows: number): number {
+  return Math.min(Math.max(Math.ceil(rows / ROWS_PER_COLUMN), 1), MAX_COLUMNS);
+}
+
 const NAME_LIMIT = 8;
 
 /** "Kevin", "Kevin and Joan", "Kevin, Joan and Ivan", and past eight names, "Kevin, Joan, … and 3 more". */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cutNotes, cutOff, nameList, type Ranked } from "./cutoff";
+import { cutNotes, cutOff, nameList, standingsColumns, type Ranked } from "./cutoff";
 
 /** Standings from points alone, in the order given. Names are A, B, C and so on. */
 function table(...pointsInOrder: number[]): Ranked[] {
@@ -213,6 +213,19 @@ describe("the sentences", () => {
   it("explain when there is no line", () => {
     expect(cutNotes(cutOff(table(3, 2), 16, { roundsLeft: 0 }))).toEqual(["Everyone plays on: only 2 players for 16 places."]);
     expect(cutNotes(cutOff(table(3, 2), 16, { roundsLeft: 2 }))).toEqual(["Nobody is cut so far: 2 players for 16 places."]);
+  });
+});
+
+describe("standingsColumns", () => {
+  it("keeps a short table in one column and splits a long one", () => {
+    expect([0, 1, 16].map(standingsColumns)).toEqual([1, 1, 1]);
+    expect([17, 32].map(standingsColumns)).toEqual([2, 2]);
+    expect([33, 48].map(standingsColumns)).toEqual([3, 3]);
+    expect([49, 64].map(standingsColumns)).toEqual([4, 4]);
+  });
+
+  it("stops at four columns however many rows there are", () => {
+    expect(standingsColumns(500)).toBe(4);
   });
 });
 
