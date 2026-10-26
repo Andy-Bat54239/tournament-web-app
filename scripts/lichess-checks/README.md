@@ -28,6 +28,8 @@ node scripts/lichess-checks/run.mjs expiry           # check 2 (takes about 90 s
 node scripts/lichess-checks/run.mjs options          # check 4
 node scripts/lichess-checks/run.mjs results          # checks 3 and 7 (takes about a minute)
 node scripts/lichess-checks/run.mjs timeouts         # clock flags and no-shows (takes about 2.5 minutes)
+node scripts/lichess-checks/run.mjs swiss-ties ccug-test-team     # check 5: a three-way tie, bye scoring (about 5 minutes)
+node scripts/lichess-checks/run.mjs swiss-no-show ccug-test-team   # check 6: a player who never moves (up to 15 minutes)
 node scripts/lichess-checks/run.mjs rate-limits      # check 8
 ```
 

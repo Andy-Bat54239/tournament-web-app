@@ -436,6 +436,193 @@ async function rateLimits() {
   check("an ordinary request still works after a stream", second.ok, `status ${second.status}`);
 }
 
+
+// Swiss checks (5 and 6). Usage: run.mjs swiss-ties [teamId] | swiss-no-show [teamId]
+// Three accounts in a 3-round Swiss on blitz 1+3, unrated, played through the Board API.
+
+const swissTeam = () => process.argv[3] ?? "ccug-test-team";
+const swissInfo = (id) => api({ path: `/api/swiss/${id}` });
+
+async function swissStandings(id) {
+  const res = await api({ path: `/api/swiss/${id}/results`, accept: "application/x-ndjson" });
+  return res.raw.split("\n").filter(Boolean).map((line) => JSON.parse(line));
+}
+
+/** Pairs of our test accounts that are playing each other in this Swiss right now. */
+async function swissGames(players, swissId) {
+  const games = new Map();
+  for (const who of players) {
+    // The default list is 9 long and "most urgent first", so ask for the maximum.
+    const res = await api({ token: who.token, path: "/api/account/playing", query: { nb: 50 } });
+    for (const game of (res.json?.nowPlaying ?? []).filter((g) => g.swissId === swissId)) {
+      const entry = games.get(game.gameId) ?? { id: game.gameId };
+      entry[game.color] = who;
+      games.set(game.gameId, entry);
+    }
+  }
+  return [...games.values()].filter((g) => g.white && g.black);
+}
+
+const MATES = {
+  white: [["white", "e2e4"], ["black", "f7f6"], ["white", "d2d4"], ["black", "g7g5"], ["white", "d1h5"]],
+  black: [["white", "f2f3"], ["black", "e7e5"], ["white", "g2g4"], ["black", "d8h4"]],
+};
+
+async function playToMate(game, winnerColor) {
+  for (const [color, uci] of MATES[winnerColor]) {
+    const res = await move(game[color], game.id, uci);
+    if (!res.ok) throw new Error(`Move ${uci} was refused in game ${game.id}: ${res.status} ${res.raw.slice(0, 160)}`);
+  }
+}
+
+async function createAndJoinSwiss(players, name) {
+  const [A] = players;
+  const created = await api({
+    token: A.token,
+    method: "POST",
+    path: `/api/swiss/new/${swissTeam()}`,
+    form: {
+      name,
+      "clock.limit": 60,
+      "clock.increment": 3,
+      nbRounds: 3,
+      startsAt: Date.now() + 90_000,
+      roundInterval: 10,
+      rated: "false",
+      "conditions.allowList": players.map((p) => p.name).join(","),
+      description: "Automated API check. Unrated.",
+    },
+    allow429: true,
+  });
+  if (!check("a Swiss can be created inside the team", Boolean(created.ok && created.json?.id), `status ${created.status} ${created.raw.slice(0, 240)}`)) return null;
+  note("Swiss create response fields", Object.keys(created.json));
+  for (const who of players) {
+    const joined = await api({ token: who.token, method: "POST", path: `/api/swiss/${created.json.id}/join` });
+    check(`${who.key} (${who.name}) joined the Swiss`, joined.ok, `status ${joined.status} ${joined.raw.slice(0, 120)}`);
+  }
+  return created.json.id;
+}
+
+/** Plays rounds as they appear. `onGame(game, round, earlier)` plays one game and returns what to record. */
+async function runSwiss(id, players, onGame, deadlineMs = 20 * 60_000) {
+  const handled = new Set();
+  const rounds = [];
+  let lastRound = 0;
+  const deadline = Date.now() + deadlineMs;
+  while (Date.now() < deadline) {
+    const info = (await swissInfo(id)).json;
+    if (info?.status === "finished") return { info, rounds };
+    if (info?.round > lastRound && info.nbOngoing > 0) {
+      const games = (await swissGames(players, id)).filter((g) => !handled.has(g.id));
+      if (games.length > 0) {
+        lastRound = info.round;
+        const playing = new Set(games.flatMap((g) => [g.white.key, g.black.key]));
+        const round = { round: info.round, bye: players.filter((p) => !playing.has(p.key)).map((p) => p.key), games: [] };
+        for (const game of games) {
+          handled.add(game.id);
+          round.games.push(await onGame(game, round, rounds));
+        }
+        rounds.push(round);
+      }
+    }
+    await sleep(5_000);
+  }
+  return { info: (await swissInfo(id)).json, rounds, timedOut: true };
+}
+
+async function finishSwiss(A, id, info) {
+  if (info?.status !== "finished") {
+    const ended = await api({ token: A.token, method: "POST", path: `/api/swiss/${id}/terminate` });
+    note("terminated the unfinished Swiss", { status: ended.status });
+  }
+}
+
+/** Check 5: a three-way tie on points, to see how the tiebreak orders it, and how byes score. */
+async function swissTies() {
+  const { A, B, C } = await needAccounts("A", "B", "C");
+  const players = [A, B, C];
+  const id = await createAndJoinSwiss(players, "CC api check: ties");
+  if (!id) return;
+  note("Swiss", `https://lichess.org/swiss/${id}`);
+  let outcome;
+  try {
+    // With 3 players each round is one game and one bye. Aim for a cycle: round 1 White wins, then the
+    // round-1 bye player beats the round-1 winner, then the round-1 loser beats the round-1 bye player.
+    outcome = await runSwiss(id, players, async (game, round, earlier) => {
+      const first = earlier[0];
+      const want = round.round === 2 ? first?.bye[0] : round.round === 3 ? first?.games[0].loser : undefined;
+      const winnerColor = game.white.key === want ? "white" : game.black.key === want ? "black" : "white";
+      await playToMate(game, winnerColor);
+      const ended = summarize(await waitForEnd(game.id, 20_000, 2_000));
+      const loserColor = winnerColor === "white" ? "black" : "white";
+      return { id: game.id, white: game.white.key, black: game.black.key, winner: game[winnerColor].key, loser: game[loserColor].key, status: ended?.status };
+    });
+    check("the Swiss ran to the end", outcome.info?.status === "finished", `status ${outcome.info?.status}${outcome.timedOut ? ", timed out" : ""}`);
+    note("rounds", outcome.rounds);
+    note("tournament JSON at the end", outcome.info);
+
+    const standings = await swissStandings(id);
+    note("final standings", standings.map((r) => ({ rank: r.rank, user: r.username, points: r.points, tieBreak: r.tieBreak, performance: r.performance, absent: r.absent })));
+    const sorted = [...standings].sort((a, b) => b.points - a.points || b.tieBreak - a.tieBreak || b.performance - a.performance);
+    check("rank follows points, then tieBreak, then performance", standings.every((row, i) => row.username === sorted[i].username));
+    check("the test produced a tie on points, so the tiebreak was exercised", new Set(standings.map((r) => r.points)).size < standings.length, `points ${standings.map((r) => r.points).join(", ")}`);
+
+    // What the Sonneborn-Berger sum would be from the games, using each opponent's final points, against what Lichess reports.
+    const points = Object.fromEntries(players.map((p) => [p.key, standings.find((r) => r.username.toLowerCase() === p.name.toLowerCase())?.points]));
+    const rows = players.map((p) => {
+      const wins = outcome.rounds.flatMap((r) => r.games).filter((g) => g.winner === p.key);
+      const byes = outcome.rounds.filter((r) => r.bye.includes(p.key)).length;
+      const row = standings.find((r) => r.username.toLowerCase() === p.name.toLowerCase());
+      const sbFromGames = wins.reduce((sum, g) => sum + points[g.loser], 0);
+      return { player: p.key, points: row?.points, wins: wins.length, byes, pointsPerBye: byes ? (row.points - wins.length) / byes : null, reportedTieBreak: row?.tieBreak, sbFromGameWins: sbFromGames };
+    });
+    note("tiebreak against a Sonneborn-Berger sum from the game wins", rows);
+  } finally {
+    await finishSwiss(A, id, outcome?.info);
+  }
+}
+
+/** Check 6: one player never moves. What happens to the game, the score, and the next round's pairings. */
+async function swissNoShow() {
+  const { A, B, C } = await needAccounts("A", "B", "C");
+  const players = [A, B, C];
+  const id = await createAndJoinSwiss(players, "CC api check: no-show");
+  if (!id) return;
+  note("Swiss", `https://lichess.org/swiss/${id}`);
+  let outcome;
+  try {
+    outcome = await runSwiss(id, players, async (game) => {
+      if (game.white !== C && game.black !== C) {
+        await playToMate(game, "white");
+        return { id: game.id, white: game.white.key, black: game.black.key, cSilent: false, status: summarize(await waitForEnd(game.id, 20_000, 2_000))?.status };
+      }
+      // C never moves. If C is Black, White still plays 1.e4 first.
+      const opponent = game.white === C ? game.black : game.white;
+      if (game.black === C) await move(game.white, game.id, "e2e4");
+      const started = Date.now();
+      const last = await waitForEnd(game.id, 240_000, 5_000);
+      const ended = last && !["created", "started"].includes(last.status);
+      const result = { id: game.id, white: game.white.key, black: game.black.key, cSilent: true, afterSeconds: Math.round((Date.now() - started) / 1000), ...summarize(last) };
+      if (!ended) {
+        await board(opponent, game.id, "abort");
+        await board(opponent, game.id, "resign");
+        result.forced = "the opponent aborted or resigned after 240 s";
+        result.statusAfterForce = summarize((await exportGame(game.id)).json)?.status;
+      }
+      return result;
+    });
+    note("rounds", outcome.rounds);
+    note("tournament JSON at the end", outcome.info);
+    const standings = await swissStandings(id);
+    note("final standings", standings.map((r) => ({ rank: r.rank, user: r.username, points: r.points, tieBreak: r.tieBreak, absent: r.absent })));
+    const cRounds = outcome.rounds.map((r) => ({ round: r.round, cPlayed: r.games.some((g) => g.white === "C" || g.black === "C"), cBye: r.bye.includes("C") }));
+    note("did C appear in each round", cRounds);
+    check("the Swiss ran to the end", outcome.info?.status === "finished", `status ${outcome.info?.status}${outcome.timedOut ? ", timed out" : ""}`);
+  } finally {
+    await finishSwiss(A, id, outcome?.info);
+  }
+}
+
 const commands = {
   smoke,
   preflight,
@@ -445,6 +632,8 @@ const commands = {
   options,
   results,
   timeouts,
+  "swiss-ties": swissTies,
+  "swiss-no-show": swissNoShow,
   "rate-limits": rateLimits,
 };
 
