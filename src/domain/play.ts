@@ -45,6 +45,10 @@ export interface GameRound {
   link?: { id: string; url: string; createdAt: string };
   /** A waiting player's claim, awaiting a referee. */
   claim?: { by: Side; at: string };
+  /** Both players have joined the Lichess game, so neither is absent. */
+  joined?: boolean;
+  /** Lichess reported something the app will not decide by itself. A referee has to. */
+  refereeNote?: string;
 }
 
 export interface ProblemReport {
