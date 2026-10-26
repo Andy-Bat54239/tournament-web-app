@@ -9,6 +9,7 @@ import {
   setSwiss,
   settleMatch,
   startKnockout,
+  simulateSwiss,
   updateAdmin,
 } from "@/app/actions";
 import type { FormatPlan } from "@/domain/format";
@@ -48,6 +49,35 @@ export interface SwissView {
   name: string | null;
   progress: string | null;
   problem: string | null;
+}
+
+/** Stands in for the Swiss being played on Lichess, so the cut-off and the bubble can be seen at every stage. */
+export function SwissSimulator() {
+  return (
+    <div className="card dev">
+      <h3>Development only: move the simulated Swiss along</h3>
+      <ActionForm action={simulateSwiss}>
+        <div className="btns">
+          <SubmitButton name="stage" value="0" className="quiet">
+            Not started
+          </SubmitButton>
+          <SubmitButton name="stage" value="2">
+            Round 2
+          </SubmitButton>
+          <SubmitButton name="stage" value="4">
+            Round 4
+          </SubmitButton>
+          <SubmitButton name="stage" value="6">
+            Last round
+          </SubmitButton>
+          <SubmitButton name="stage" value="finished">
+            Finished
+          </SubmitButton>
+        </div>
+      </ActionForm>
+      <p className="note">This stands in for the Swiss on Lichess with the mock. It does not exist in the real app.</p>
+    </div>
+  );
 }
 
 export function BracketCard({

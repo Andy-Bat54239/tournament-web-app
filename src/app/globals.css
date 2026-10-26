@@ -430,8 +430,40 @@ th {
   font-size: 14px;
 }
 
-tr.cut td {
+/* The Swiss table: the line between the last place that plays on and the first that does not. */
+tr.cutline td {
+  padding: 3px 4px;
+  border-top: 2px solid var(--gold);
   border-bottom: 2px solid var(--gold);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+td.fate {
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--mut);
+}
+
+tr.through td.fate {
+  color: var(--em);
+  font-weight: 700;
+}
+
+tr.bubble td {
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+}
+
+tr.bubble td.fate {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+tr.out td {
+  color: var(--mut);
 }
 
 .msg {

@@ -4,13 +4,13 @@ import { planFormat } from "@/domain/format";
 import { openMatches } from "@/domain/knockout";
 import { field, rosterCounts } from "@/domain/registration";
 import { announcementText } from "@/domain/schedule";
-import { swissProgress } from "@/domain/swiss";
 import { readStore } from "@/server/instance";
 import { getLichess } from "@/server/lichess";
-import { ask } from "@/server/lichess/ask";
 import { buildRoundBoard } from "@/server/round-board";
-import type { LichessClient } from "@/server/lichess/types";
 import { getSessionUsername } from "@/server/session";
+import { swissStandings, type SwissStandings } from "@/server/swiss";
+import { getSwissFeed } from "@/server/swiss-feed";
+import { AutoRefresh } from "./auto-refresh";
 import { LoginCard } from "./login-card";
 import {
   AdminsCard,
@@ -22,17 +22,18 @@ import {
   ResultsCard,
   RoundsCard,
   ScheduleCard,
+  SwissSimulator,
   type SwissView,
 } from "./organizer-cards";
 import type { MatchOption } from "./results-form";
+import { SwissTable } from "./swiss-table";
 
-/** Where the chosen Swiss has got to, asked of Lichess. Null when no Swiss is chosen. */
-async function swissView(swissId: string | null, lichess: LichessClient): Promise<SwissView | null> {
+/** The chosen Swiss for the build form: where it has got to, or why Lichess could not say. Null when none is chosen. */
+function swissView(swissId: string | null, standings: SwissStandings): SwissView | null {
   if (!swissId) return null;
-  const found = await ask(() => lichess.getSwiss(swissId));
-  if (!found.ok) return { id: swissId, name: null, progress: null, problem: found.error };
-  if (!found.value) return { id: swissId, name: null, progress: null, problem: "Lichess has no Swiss with this id any more." };
-  return { id: swissId, name: found.value.name, progress: swissProgress(found.value), problem: null };
+  if (standings.kind === "unavailable") return { id: swissId, name: null, progress: null, problem: standings.error };
+  if (standings.kind === "table" && standings.name) return { id: swissId, name: standings.name, progress: standings.progress, problem: null };
+  return { id: swissId, name: null, progress: null, problem: "Lichess could not say where it has got to." };
 }
 
 /** Organizer tools. Each card shows only if the viewer has that permission; the store enforces it again on every change. */
@@ -56,7 +57,7 @@ export async function OrganizerContent() {
 
   const roundBoard = buildRoundBoard(store, now);
   const lichess = getLichess();
-  const swiss = can("rounds") && !store.tournament.bracket ? await swissView(store.tournament.swissId, lichess) : null;
+  const swiss = can("rounds") && !store.tournament.bracket ? await swissStandings(store, lichess, getSwissFeed()) : null;
 
   const who = (
     <form action={logout} className="who">
@@ -121,9 +122,16 @@ export async function OrganizerContent() {
           plan={planFormat(players.length)}
           players={players.length}
           built={tournament.qualifiers?.length ?? null}
-          swiss={swiss}
+          swiss={swiss && swissView(tournament.swissId, swiss)}
           live={lichess.live}
         />
+      )}
+      {swiss?.kind === "table" && (
+        <>
+          <SwissTable swiss={swiss} />
+          {!lichess.live && <SwissSimulator />}
+          {!swiss.view.finished && <AutoRefresh everyMs={30_000} />}
+        </>
       )}
       {(can("rounds") || can("result") || can("forfeit")) && roundBoard && (
         <RoundsCard board={roundBoard} canStart={can("rounds")} />

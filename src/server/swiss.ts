@@ -59,6 +59,8 @@ export type SwissStandings =
       name: string | null;
       /** Where the Swiss has got to, in words. */
       progress: string;
+      /** False before the first round, when there is nothing to rank yet. */
+      started: boolean;
       view: CutView;
       /** When Lichess was last read. Null for the standings kept in the bracket. */
       readAt: Date | null;
@@ -88,6 +90,7 @@ export async function swissStandings(store: Store, lichess: LichessClient, feed:
       kind: "table",
       name: null,
       progress: "Final standings",
+      started: true,
       view: cutOff(rows, qualifiers.length, { roundsLeft: 0 }),
       readAt: null,
       late: null,
@@ -113,6 +116,7 @@ export async function swissStandings(store: Store, lichess: LichessClient, feed:
     kind: "table",
     name: info.name,
     progress: swissProgress(info),
+    started: info.status !== "created",
     view: cutOff(
       standings.filter((s) => entered.has(s.username.toLowerCase())),
       plan.qualifiers,

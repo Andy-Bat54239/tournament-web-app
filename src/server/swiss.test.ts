@@ -149,13 +149,24 @@ describe("the Swiss on the pages", () => {
     w.store.tournament.swissId = "FgUapYId";
     const lichess = new FakeLive(info({ status: "started", round: 3, ongoing: 4 }), table);
     const result = await swissStandings(w.store, lichess, new SwissFeed(lichess));
-    expect(result).toMatchObject({ kind: "table", name: "Castle Connect Swiss", progress: "Round 3 of 5, 4 games still being played", late: null });
+    expect(result).toMatchObject({ kind: "table", name: "Castle Connect Swiss", progress: "Round 3 of 5, 4 games still being played", started: true, late: null });
     if (result.kind !== "table") return;
     expect(result.view.places).toBe(16);
     expect(result.view.finished).toBe(false);
     expect(result.view.rows).toHaveLength(20);
     expect(result.view.rows.filter((r) => r.inside)).toHaveLength(16);
     expect(result.readAt).toBeInstanceOf(Date);
+  });
+
+  it("has nobody to rank before the first round, and says the Swiss has not started", async () => {
+    const w = swissWorld();
+    w.store.tournament.swissId = "FgUapYId";
+    const lichess = new FakeLive(info({ status: "created", round: 0 }), table);
+    const result = await swissStandings(w.store, lichess, new SwissFeed(lichess));
+    expect(result).toMatchObject({ kind: "table", started: false, progress: "Not started yet" });
+    if (result.kind !== "table") return;
+    expect(result.view.rows).toEqual([]);
+    expect(lichess.calls).toEqual(["swiss FgUapYId"]);
   });
 
   it("says what is decided once the Swiss is finished", async () => {

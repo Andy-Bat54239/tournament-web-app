@@ -164,6 +164,20 @@ export async function simulateGame(_prev: FormState, data: FormData): Promise<Fo
   });
 }
 
+/** Development only: moves the simulated Swiss along, so the cut-off and the bubble can be seen at every stage. */
+export async function simulateSwiss(_prev: FormState, data: FormData): Promise<FormState> {
+  return asUser(async (actor) => {
+    const mock = getMockLichess();
+    const allowed = process.env.NODE_ENV !== "production" || process.env.ALLOW_MOCK_LOGIN === "true";
+    if (!mock || !allowed) return { error: "The simulator is only for development." };
+    if (!(await readStore()).can(actor, "rounds")) return { error: "You don’t have access to that." };
+    const stage = text(data, "stage");
+    if (!mock.simulateSwiss(stage === "finished" ? null : Number(stage))) return { error: "Choose where the Swiss is." };
+    refresh();
+    return { ok: "Done." };
+  });
+}
+
 // Organizers
 
 export async function changeSchedule(_prev: FormState, data: FormData): Promise<FormState> {
