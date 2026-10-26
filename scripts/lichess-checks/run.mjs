@@ -387,7 +387,7 @@ async function timeouts() {
   const flagged = (connected) => ended.get(games.find((g) => g.key === "clock runs out" && g.connected === connected).id);
   check("a connected player's clock running out ends the game", flagged(true)?.status === "outoftime", flagged(true)?.status ?? "not finished");
   note("an API-only game is flagged", Boolean(flagged(false)));
-  save("timeouts", { games: games.map(({ streams, ...g }) => ({ ...g, moves: g.moves.length, ended: ended.get(g.id) ?? null })) });
+  save("timeouts", { games: games.map((g) => ({ key: g.key, id: g.id, connected: g.connected, moves: g.moves.length, ended: ended.get(g.id) ?? null })) });
 }
 
 /** Check 8: how much the API tolerates at 64-player scale, one request at a time. */

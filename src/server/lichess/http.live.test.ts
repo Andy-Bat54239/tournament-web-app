@@ -57,7 +57,7 @@ describe.skipIf(!live)("the live Lichess client", () => {
   });
 
   it("makes a restricted link, hands out a result, and reads it the way the app does", { timeout: 90_000 }, async () => {
-    const [a, b, c] = await Promise.all([username(A), username(B), username(C)]);
+    const [a, b] = await Promise.all([username(A), username(B)]);
 
     // 1. A link for A (White) and B, using the app's own clock and rules.
     const link = await lichess.createGameLink(request([a, b]));
