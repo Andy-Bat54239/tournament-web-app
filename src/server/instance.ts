@@ -7,6 +7,7 @@ import { StateRepository } from "./db/repository";
 import { getLichess } from "./lichess";
 import { StoreProvider } from "./provider";
 import type { PersistedState, Store } from "./store";
+import { readOpenGames, type SyncReport } from "./sync";
 
 /**
  * The one tournament this app runs, kept in Postgres (see StoreProvider and db/connect). Configure with:
@@ -110,4 +111,9 @@ export async function readStore(): Promise<Store> {
  */
 export async function updateStore<T>(change: (store: Store) => Promise<T> | T): Promise<T> {
   return (await provider()).update(change);
+}
+
+/** Reads the games that have a link out from Lichess and records what they say. See readOpenGames. */
+export async function syncResults(): Promise<SyncReport> {
+  return readOpenGames(await provider(), getLichess());
 }
