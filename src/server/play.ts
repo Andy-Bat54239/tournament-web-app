@@ -18,23 +18,13 @@ import {
   type ProblemReport,
 } from "@/domain/play";
 import { sameUser, type Result } from "@/domain/registration";
-import { LichessError, LichessRateLimited, type GameLink, type LichessClient } from "./lichess/types";
+import { ask } from "./lichess/ask";
+import type { GameLink, LichessClient } from "./lichess/types";
 import type { Store } from "./store";
 
 const ok = { ok: true } as const;
 const fail = (error: string) => ({ ok: false, error }) as const;
 const NO_MATCH = "You don’t have a match to play right now.";
-
-/** Runs a Lichess call and turns any failure into a message a player can act on. */
-async function ask<T>(call: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
-  try {
-    return { ok: true, value: await call() };
-  } catch (error) {
-    if (error instanceof LichessRateLimited) return fail("Lichess is busy. Try again in a minute.");
-    if (error instanceof LichessError) return fail("Lichess did not answer as expected. Try again in a moment.");
-    return fail("Could not reach Lichess. Try again in a moment.");
-  }
-}
 
 /**
  * Links being made on Lichess, by match and game. Shared by every request in this process, so two players who
