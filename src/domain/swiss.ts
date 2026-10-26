@@ -31,3 +31,20 @@ export function swissProgress(swiss: { status: "created" | "started" | "finished
       return `Finished after ${swiss.rounds} round${swiss.rounds === 1 ? "" : "s"}`;
   }
 }
+
+/**
+ * How many rounds can still change the points. Once the Swiss is running the round being played counts, because
+ * its games are not in the points yet. Between rounds that over-counts by one, which only makes the cut-off
+ * more careful about calling anyone through or out.
+ */
+export function roundsLeft(swiss: { status: "created" | "started" | "finished"; round: number; rounds: number }): number {
+  switch (swiss.status) {
+    case "finished":
+      return 0;
+    case "created":
+      return swiss.rounds;
+    case "started":
+      // A running Swiss always has the current round to go.
+      return Math.min(Math.max(swiss.rounds - swiss.round + 1, 1), swiss.rounds);
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSwissId, swissProgress } from "./swiss";
+import { parseSwissId, roundsLeft, swissProgress } from "./swiss";
 
 describe("parseSwissId", () => {
   it("takes the bare id", () => {
@@ -48,5 +48,24 @@ describe("swissProgress", () => {
     expect(swissProgress({ ...swiss, status: "started", ongoing: 1 })).toBe("Round 3 of 5, 1 game still being played");
     expect(swissProgress({ ...swiss, status: "started", ongoing: 0 })).toBe("Round 3 of 5");
     expect(swissProgress({ round: 2, rounds: 2, ongoing: 0, status: "finished" })).toBe("Finished after 2 rounds");
+  });
+});
+
+describe("roundsLeft", () => {
+  it("is every round before the start and none after the end", () => {
+    expect(roundsLeft({ status: "created", round: 0, rounds: 5 })).toBe(5);
+    expect(roundsLeft({ status: "finished", round: 5, rounds: 5 })).toBe(0);
+    expect(roundsLeft({ status: "finished", round: 3, rounds: 3 })).toBe(0);
+  });
+
+  it("counts the round being played, whose games are not in the points yet", () => {
+    expect(roundsLeft({ status: "started", round: 1, rounds: 5 })).toBe(5);
+    expect(roundsLeft({ status: "started", round: 3, rounds: 5 })).toBe(3);
+    expect(roundsLeft({ status: "started", round: 5, rounds: 5 })).toBe(1);
+  });
+
+  it("stays between one and the number of rounds while the Swiss is running", () => {
+    expect(roundsLeft({ status: "started", round: 0, rounds: 5 })).toBe(5);
+    expect(roundsLeft({ status: "started", round: 9, rounds: 5 })).toBe(1);
   });
 });
