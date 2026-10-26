@@ -208,20 +208,25 @@ async function restrictedLink() {
 
 /** Check 1, browser half: the real link a player would tap. Needs a person in a browser. */
 async function manualLink() {
-  const stateFile = join(here, "results", "manual-link.json");
+  // Its own file: every command saves its findings to <command>.json at the end, which would overwrite the id.
+  const stateFile = join(here, "results", "manual-link-state.json");
   const step = process.argv[3];
   if (step === "create") {
     const { A, B } = await needAccounts("A", "B");
     const { res, id } = await openChallenge(A, { users: names(A, B), expiresInMs: 45 * 60_000 });
     if (!id) throw new Error(`Could not create the challenge: ${res.status} ${res.raw.slice(0, 200)}`);
-    save("manual-link", { id, a: A.name, b: B.name });
+    save("manual-link-state", { id, a: A.name, b: B.name });
     console.log(`\nOpen this link as an account that is NOT named in the challenge, and as a logged-out visitor:\n  https://lichess.org/${id}\n`);
     console.log("Do not click it as the two named accounts. Then run: node scripts/lichess-checks/run.mjs manual-link verify");
   } else if (step === "verify") {
     if (!existsSync(stateFile)) throw new Error("Run `manual-link create` first.");
-    const { id, a, b } = JSON.parse(readFileSync(stateFile, "utf8"));
+    const saved = JSON.parse(readFileSync(stateFile, "utf8"));
+    const id = process.argv[4] ?? saved.id;
+    const { a, b } = saved;
+    if (!id) throw new Error("No challenge id. Run `manual-link create`, or pass the id: manual-link verify <id>.");
     const { A } = await needAccounts("A");
     const state = await show(A, id);
+    check("the challenge was found", state.ok, `status ${state.status}`);
     note("challenge status", state.json?.status ?? state.status);
     const game = await exportGame(id);
     if (game.status === 404) check("nobody got into a game through the link", true, "no game exists for this id");
