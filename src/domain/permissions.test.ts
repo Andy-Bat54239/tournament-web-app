@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PERMISSIONS, PRESETS, can, type AdminAccess } from "./permissions";
+import { GRANTABLE, PERMISSIONS, PRESETS, can, grantChanges, isPermission, isPreset, presetOf, sortedGrants, type AdminAccess } from "./permissions";
 
 const joel: AdminAccess = { username: "Joel", superAdmin: true, grants: [] };
 const referee: AdminAccess = { username: "Ruth", superAdmin: false, grants: PRESETS.referee };
@@ -38,3 +38,38 @@ describe("can", () => {
     }
   });
 });
+
+describe("ticking permissions", () => {
+  it("leaves out managing admins, which only the super admin does", () => {
+    expect(GRANTABLE).not.toContain("admins");
+    expect(GRANTABLE).toHaveLength(PERMISSIONS.length - 1);
+  });
+
+  it("knows a permission or a preset by its exact name, and nothing inherited", () => {
+    expect(isPermission("result")).toBe(true);
+    for (const bad of ["Result", "toString", "__proto__", "", 3, null, undefined]) expect(isPermission(bad), String(bad)).toBe(false);
+    expect(isPreset("referee")).toBe(true);
+    for (const bad of ["Referee", "toString", "constructor", "", 3, null]) expect(isPreset(bad), String(bad)).toBe(false);
+  });
+
+  it("puts ticks in a fixed order and drops repeats", () => {
+    expect(sortedGrants(["announce", "result", "announce", "forfeit"])).toEqual(["result", "forfeit", "announce"]);
+  });
+
+  it("recognises a preset however its ticks are ordered, and calls anything else custom", () => {
+    expect(presetOf(["announce", "forfeit", "result"])).toBe("referee");
+    expect(presetOf([...PRESETS.desk])).toBe("desk");
+    expect(presetOf(["result"])).toBeNull();
+    expect(presetOf([...PRESETS.referee, "settings"])).toBeNull();
+    expect(presetOf([])).toBeNull();
+  });
+
+  it("says what was added and what was taken away", () => {
+    expect(grantChanges(["result", "forfeit"], ["forfeit", "roster", "announce"])).toEqual({
+      added: ["roster", "announce"],
+      removed: ["result"],
+    });
+    expect(grantChanges(["result"], ["result"])).toEqual({ added: [], removed: [] });
+  });
+});
+

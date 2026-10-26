@@ -56,3 +56,40 @@ export function can(
   if (access.superAdmin) return true;
   return !tournamentEnded && access.grants.includes(permission);
 }
+
+/**
+ * What the super admin can tick for another admin. "admins" is left out on purpose: adding admins and ending the
+ * tournament are the super admin's alone, whatever anyone else is ticked for (brief, section 4).
+ */
+export const GRANTABLE = PERMISSIONS.filter((p) => p !== "admins");
+
+export function isPermission(value: unknown): value is Permission {
+  return typeof value === "string" && (PERMISSIONS as readonly string[]).includes(value);
+}
+
+export function isPreset(value: unknown): value is Preset {
+  return typeof value === "string" && Object.hasOwn(PRESETS, value);
+}
+
+/** Puts permissions in the order of PERMISSIONS and drops repeats, so the same ticks always look the same. */
+export function sortedGrants(grants: Iterable<Permission>): Permission[] {
+  const given = new Set(grants);
+  return PERMISSIONS.filter((p) => given.has(p));
+}
+
+/** The preset these ticks are exactly, or null when they have been adjusted. */
+export function presetOf(grants: readonly Permission[]): Preset | null {
+  const mine = sortedGrants(grants).join();
+  for (const name of Object.keys(PRESETS) as Preset[]) {
+    if (sortedGrants(PRESETS[name]).join() === mine) return name;
+  }
+  return null;
+}
+
+/** What changed between two sets of ticks. */
+export function grantChanges(before: readonly Permission[], after: readonly Permission[]) {
+  return {
+    added: sortedGrants(after.filter((p) => !before.includes(p))),
+    removed: sortedGrants(before.filter((p) => !after.includes(p))),
+  };
+}
