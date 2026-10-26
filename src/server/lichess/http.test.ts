@@ -169,6 +169,41 @@ describe("getSwissStandings", () => {
   });
 });
 
+describe("getSwiss", () => {
+  const finished = {
+    id: "FgUapYId",
+    createdBy: "andybat7",
+    name: "CC api check: no-show",
+    round: 2,
+    nbRounds: 2,
+    nbPlayers: 3,
+    nbOngoing: 0,
+    status: "finished",
+  };
+
+  it("says how far the Swiss has got", async () => {
+    const { lichess, calls } = make([{ body: finished }, { body: { ...finished, status: "started", round: 3, nbRounds: 5, nbOngoing: 14 } }]);
+    expect(await lichess.getSwiss("FgUapYId")).toEqual({ id: "FgUapYId", name: "CC api check: no-show", status: "finished", round: 2, rounds: 2, players: 3, ongoing: 0 });
+    expect(calls[0].url.pathname).toBe("/api/swiss/FgUapYId");
+    expect(await lichess.getSwiss("FgUapYId")).toMatchObject({ status: "started", round: 3, rounds: 5, ongoing: 14 });
+  });
+
+  it("returns null when there is no such Swiss", async () => {
+    const { lichess } = make([{ status: 404, body: { error: "Not found" } }]);
+    expect(await lichess.getSwiss("ZZZZZZZZ")).toBeNull();
+  });
+
+  it("complains when Lichess answers with something else", async () => {
+    const { lichess } = make([{ body: { id: "x", status: "weird" } }, { status: 500, text: "oops" }]);
+    await expect(lichess.getSwiss("FgUapYId")).rejects.toBeInstanceOf(LichessError);
+    await expect(lichess.getSwiss("FgUapYId")).rejects.toBeInstanceOf(LichessError);
+  });
+
+  it("knows it is the real Lichess", () => {
+    expect(make([]).lichess.live).toBe(true);
+  });
+});
+
 describe("requests", () => {
   it("stops on a 429 instead of retrying, as Lichess asks", async () => {
     const { lichess, calls } = make([{ status: 429, text: "Too many requests" }]);

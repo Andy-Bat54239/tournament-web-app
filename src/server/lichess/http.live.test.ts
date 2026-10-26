@@ -131,4 +131,17 @@ describe.skipIf(!live)("the live Lichess client", () => {
     expect(standings.map((s) => s.rank)).toEqual([1, 2, 3]);
     expect(standings[0]).toEqual({ rank: 1, username: "patience-mushishi", points: 2 });
   });
+
+  it("reads how far a Swiss has got, and returns null for one that does not exist", async () => {
+    expect(await lichess.getSwiss("FgUapYId")).toEqual({
+      id: "FgUapYId",
+      name: "CC api check: no-show",
+      status: "finished",
+      round: 2,
+      rounds: 2, // it was planned for 3 and Lichess ended it early, as docs/lichess-checks.md says
+      players: 3,
+      ongoing: 0,
+    });
+    expect(await lichess.getSwiss("ZZZZZZZZ")).toBeNull();
+  });
 });
