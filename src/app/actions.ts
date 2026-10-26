@@ -2,7 +2,8 @@
 
 import { refresh } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
-import type { Result } from "@/domain/registration";
+import { isPreset } from "@/domain/permissions";
+import { LICHESS_USERNAME, type Result } from "@/domain/registration";
 import type { GameOutcome } from "@/domain/match";
 import type { FormState } from "@/lib/form-state";
 import { parseSwissId, swissProgress } from "@/domain/swiss";
@@ -261,6 +262,44 @@ async function applyMatchChange(actor: string, matchId: string, reason: string, 
     default:
       return { error: "Choose what happened." };
   }
+}
+
+// Admins. Only the super admin: the store refuses anyone else, and Lichess is not asked on a stranger's behalf.
+
+export async function addAdmin(_prev: FormState, data: FormData): Promise<FormState> {
+  return asUser(async (actor) => {
+    const username = text(data, "username");
+    const preset = text(data, "preset");
+    if (!(await readStore()).access(actor)?.superAdmin) return { error: "You don’t have access to that." };
+    if (!LICHESS_USERNAME.test(username)) return { error: "Enter a Lichess username: letters, numbers, _ or -." };
+    // The name is checked on Lichess, so a typo cannot leave a real person without access, and the spelling is theirs.
+    const found = await ask(() => getLichess().getProfile(username));
+    if (!found.ok) return { error: found.error };
+    if (!found.value) return { error: `Lichess has no account called ${username}.` };
+    const name = found.value.username;
+    const result = await updateStore((store) => store.addAdmin(actor, name, preset, new Date()));
+    return finish(result, `${name} is an admin now. They log in with Lichess and see the tools you ticked.`);
+  });
+}
+
+/** `do` is "save" (the ticks), "referee" or "desk" (back to that preset's ticks), or "remove". */
+export async function updateAdmin(_prev: FormState, data: FormData): Promise<FormState> {
+  return asUser(async (actor) => {
+    const username = text(data, "username");
+    const change = text(data, "do");
+    const now = new Date();
+    if (change === "save") {
+      const grants = data.getAll("grant").map(String);
+      return finish(await updateStore((store) => store.setAdminAccess(actor, username, grants, now)), `Saved ${username}’s access.`);
+    }
+    if (change === "remove") {
+      return finish(await updateStore((store) => store.removeAdmin(actor, username, now)), `${username} is no longer an admin.`);
+    }
+    if (isPreset(change)) {
+      return finish(await updateStore((store) => store.applyAdminPreset(actor, username, change, now)), `${username} is back on the ${change} ticks.`);
+    }
+    return { error: "Choose what to do." };
+  });
 }
 
 export async function endTournament(): Promise<FormState> {
