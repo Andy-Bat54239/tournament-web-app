@@ -8,9 +8,11 @@ import {
   resetBracket,
   setSwiss,
   settleMatch,
+  startKnockout,
   updateAdmin,
 } from "@/app/actions";
 import type { FormatPlan } from "@/domain/format";
+import { STAGES, countStages, roundUpdateText, type BoardStage, type RoundBoard } from "@/domain/round-board";
 import { GRANTABLE, PERMISSION_LABELS } from "@/domain/permissions";
 import { formatUgandaPhone } from "@/domain/phone";
 import type { Registration, RosterCounts } from "@/domain/registration";
@@ -18,6 +20,7 @@ import { formatWhen } from "@/domain/schedule";
 import type { DeskItem, DeskProblem } from "@/server/play";
 import type { AdminRecord, AuditEntry } from "@/server/store";
 import { ActionForm } from "./action-form";
+import { AutoSync } from "./auto-sync";
 import { ResultsForm, type MatchOption } from "./results-form";
 import { SubmitButton } from "./submit-button";
 
@@ -116,12 +119,84 @@ export function BracketCard({
         <ActionForm action={buildBracket}>
           <label htmlFor="qualifiers">Qualifiers (leave blank for the standard cut-off)</label>
           <input id="qualifiers" name="qualifiers" type="number" inputMode="numeric" min={2} max={32} />
+          <label className="ck">
+            <input type="checkbox" name="hold" />
+            <span>
+              Hold the knockout. Players see who they play, but no waiting time runs until you press Start. Use this
+              when the knockout is on another day.
+            </span>
+          </label>
           <SubmitButton className="wide">
             {plan.kind === "knockout_only" ? "Build the bracket" : "Build the bracket from the Swiss standings"}
           </SubmitButton>
         </ActionForm>
       )}
       {!live && <p className="note">Lichess is simulated here, so the standings are invented.</p>}
+    </div>
+  );
+}
+
+const STAGE_LABEL: Record<BoardStage, string> = {
+  flagged: "Needs a referee",
+  playing: "Playing",
+  ready: "Waiting for players",
+  held: "On hold",
+  waiting: "Waiting for earlier matches",
+  decided: "Done",
+};
+
+/** Every match of the knockout and where it stands, with the button that starts a held knockout. Refreshes itself. */
+export function RoundsCard({ board, canStart }: { board: RoundBoard; canStart: boolean }) {
+  const all = board.rounds.flatMap((r) => r.matches);
+  const totals = countStages(all);
+  const update = roundUpdateText(board);
+  return (
+    <div className="card">
+      <h3>Round control</h3>
+      {board.held && (
+        <>
+          <p className="strong">The knockout is on hold.</p>
+          <p className="note">
+            Players can see who they play, but no waiting time is running and nobody can start a game.
+          </p>
+          {canStart && (
+            <ActionForm action={startKnockout}>
+              <SubmitButton className="wide gold">Start the knockout</SubmitButton>
+            </ActionForm>
+          )}
+        </>
+      )}
+      <p className="chips">
+        {STAGES.filter((stage) => totals[stage] > 0).map((stage) => (
+          <span key={stage} className={`chip ${stage}`}>
+            {STAGE_LABEL[stage]}: {totals[stage]}
+          </span>
+        ))}
+      </p>
+      {board.rounds.map((round) => (
+        <section key={round.round} aria-label={round.title}>
+          <h4 className="board-round">{round.title}</h4>
+          <ul className="board">
+            {round.matches.map((m) => (
+              <li key={m.id} className={m.stage}>
+                <span className="who">
+                  <b>{m.title}</b>: {m.hi ?? "?"} v {m.lo ?? "?"}
+                </span>
+                <span className={`chip ${m.stage}`}>{STAGE_LABEL[m.stage]}</span>
+                <span className="note tight">{m.note}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+      <h4 className="board-round">Round update for the community chat</h4>
+      <div className="msg">{update}</div>
+      <div className="btns spaced">
+        <a className="button" href={`https://wa.me/?text=${encodeURIComponent(update)}`} target="_blank" rel="noopener noreferrer">
+          Share on WhatsApp
+        </a>
+      </div>
+      <AutoSync everyMs={15_000} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { swissProgress } from "@/domain/swiss";
 import { readStore } from "@/server/instance";
 import { getLichess } from "@/server/lichess";
 import { ask } from "@/server/lichess/ask";
+import { buildRoundBoard } from "@/server/round-board";
 import type { LichessClient } from "@/server/lichess/types";
 import { getSessionUsername } from "@/server/session";
 import { LoginCard } from "./login-card";
@@ -19,6 +20,7 @@ import {
   DeskCard,
   RefereeCard,
   ResultsCard,
+  RoundsCard,
   ScheduleCard,
   type SwissView,
 } from "./organizer-cards";
@@ -52,6 +54,7 @@ export async function OrganizerContent() {
   const can = (p: Parameters<typeof store.can>[1]) => store.can(username, p);
   const anyAccess = access && (access.superAdmin || access.grants.some((g) => can(g)));
 
+  const roundBoard = buildRoundBoard(store, now);
   const lichess = getLichess();
   const swiss = can("rounds") && !store.tournament.bracket ? await swissView(store.tournament.swissId, lichess) : null;
 
@@ -121,6 +124,9 @@ export async function OrganizerContent() {
           swiss={swiss}
           live={lichess.live}
         />
+      )}
+      {(can("rounds") || can("result") || can("forfeit")) && roundBoard && (
+        <RoundsCard board={roundBoard} canStart={can("rounds")} />
       )}
       {(can("result") || can("forfeit")) && (
         <RefereeCard items={desk.items} problems={desk.problems} canDecide={can("forfeit")} />
