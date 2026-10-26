@@ -129,6 +129,31 @@ tournament ends (the super admin keeps it). Access is deny-by-default.
 - The super admin is whoever logs in with the `SUPER_ADMIN` username, so it is not an admin record and cannot be
   removed from the app.
 
+## Round control
+
+Once a bracket is built, the Organizer page has a **Round control** card for anyone with the rounds, results or
+forfeit permission. It lists every match of every round and where it stands, and refreshes itself every 15 seconds:
+
+| Stage                       | Meaning                                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| Needs a referee             | A claim, a waiting time that ran out, an odd result from Lichess, or repeated aborts.         |
+| Playing                     | Both players have joined the game on Lichess.                                                |
+| Waiting for players         | The waiting time is running, with who is ready and how long is left.                          |
+| On hold                     | The players are known, but the knockout has not been started (see below).                    |
+| Waiting for earlier matches | The players are not known yet.                                                               |
+| Done                        | Decided, with who advanced, how, and the score.                                              |
+
+**Holding the knockout.** The brief runs a 64-player event as the Swiss one Sunday and the knockout the next. If the
+bracket were built straight after the Swiss, every first-round match would start its 3-minute clock at once. So the
+build form has a **Hold the knockout** tick. A held bracket is public and players see who they play ("The knockout
+has not started yet"), but no waiting time runs and nobody can start a game. **Start the knockout** (rounds
+permission) gives every ready match its waiting time from that moment. Without the tick, matches open at once, as
+before. Referees can still settle a held match by hand. Resetting the bracket clears the hold.
+
+**Round update.** The card writes a message for the community chat, for example "Quarterfinals are live. 1 of 4
+matches finished. Still waiting to start: Ivan v Patience, Brian v Sarah." The organizer opens it in WhatsApp,
+picks the group and sends it. Nothing is sent by the app.
+
 ## Layout
 
 ```
@@ -169,7 +194,8 @@ These fill gaps in the brief. Each is one constant or one line, so they are chea
    afterwards.
 7. **Waitlisted players who get promoted still have to check in**; the desk can check them in.
 8. **The first 3-minute wait starts the moment a match becomes ready**, because the bracket rolls. The 2-minute wait
-   after a game ends is also used for games 3 to 5 and for a game that has to be replayed.
+   after a game ends is also used for games 3 to 5 and for a game that has to be replayed. **Unless the knockout is
+   built on hold** (see "Round control"), when no wait runs until an organizer presses Start.
 9. **An aborted game counts as not played.** Lichess cannot be told to block aborts, and an early resignation is
    recorded as one. The game is replayed on a new link and both players tap ready again. Two aborts in one match call
    a referee. Joel still has to decide who is at fault and how many are allowed.
@@ -184,7 +210,7 @@ These fill gaps in the brief. Each is one constant or one line, so they are chea
 - **The Swiss mirror:** live standings and round status on the public page while the Swiss is being played (the
   organizer can see the round, the public cannot yet), and the cut-off line and bubble.
 - **Creating the Swiss from the app.** It is created on Lichess by hand for now.
-- **Round control:** starting rounds, matches waiting or flagged.
+- **The Swiss view:** the cut-off line and the bubble on live Swiss standings, for the organizers and the public.
 - **Rating snapshot** when sign-ups close, the two-admin edit warning, and data deletion requests.
 - **Phase 2:** the standings image, round announcement text, and push notifications.
 - **The rules, fair-play and consent wording** (the brief lists it as open). The sign-up checkbox is a placeholder.
