@@ -28,6 +28,13 @@ export class OAuthError extends Error {
   }
 }
 
+/** What the app remembers, in a short-lived signed cookie, while the person is away at Lichess. */
+export interface LoginFlow {
+  state: string;
+  verifier: string;
+  next: string;
+}
+
 /** Pages a login may return to. A fixed list, so a crafted link cannot send a player somewhere else. */
 const RETURN_PAGES = ["/", "/match", "/bracket", "/organizer"];
 
