@@ -14,5 +14,8 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
     environment: "node",
+    // Starting a PGlite database takes a moment, and several test files start one at the same time.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
   },
 });
