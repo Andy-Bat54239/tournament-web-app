@@ -252,7 +252,7 @@ async function options() {
   check("comma-separated rules are accepted", Boolean(combined.id), `status ${combined.res.status} ${combined.res.raw.slice(0, 160)}`);
   if (combined.id) await cancel(A, combined.id);
 
-  for (const [label, rules] of [["with noGiveTime", "noGiveTime"], ["control, no rules", undefined]]) {
+  for (const rules of ["noGiveTime", undefined]) {
     const id = await startGame({ A, B }, { rules });
     await move(A, id, "e2e4");
     const gift = await api({ token: B.token, method: "POST", path: `/api/round/${id}/add-time/15` });
