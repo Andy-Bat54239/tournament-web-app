@@ -59,6 +59,7 @@ function createStore(): Store {
     qualifiers: null,
     bracket: null,
     records: {},
+    play: {},
   };
   return new Store({
     tournament,

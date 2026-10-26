@@ -45,6 +45,7 @@ function makeStore(players = 0, cap = 64): Store {
       qualifiers: null,
       bracket: null,
       records: {},
+      play: {},
     },
   });
 }

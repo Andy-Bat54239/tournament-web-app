@@ -12,6 +12,7 @@ import {
   type ResolvedBracket,
 } from "@/domain/knockout";
 import type { GameOutcome } from "@/domain/match";
+import type { MatchPlay } from "@/domain/play";
 import { can, type AdminAccess, type Permission, type Preset } from "@/domain/permissions";
 import { normalizeUgandaPhone } from "@/domain/phone";
 import {
@@ -38,6 +39,7 @@ import {
   type Schedule,
 } from "@/domain/schedule";
 import type { LichessProfile, StandingRow } from "./lichess/types";
+import { MatchPlayService } from "./play";
 
 export interface Qualifier {
   seed: number;
@@ -81,6 +83,8 @@ export interface TournamentState {
   qualifiers: Qualifier[] | null;
   bracket: Bracket | null;
   records: Record<string, MatchRecord>;
+  /** The game each open match is on, who is ready, links, claims and problems. Keyed by match id. */
+  play: Record<string, MatchPlay>;
 }
 
 export interface StoreConfig {
@@ -108,9 +112,12 @@ export class Store {
   registrations: Registration[];
   admins: AdminRecord[];
   audit: AuditEntry[] = [];
+  /** Playing the matches: waiting windows, links, reading results, claims and problem reports. */
+  readonly play: MatchPlayService;
   private readonly superAdmin: string | null;
 
   constructor(config: StoreConfig) {
+    this.play = new MatchPlayService(this);
     this.tournament = config.tournament;
     this.registrations = config.registrations ?? [];
     this.admins = config.admins ?? [];
@@ -209,7 +216,8 @@ export class Store {
     return this.can(actor, permission) ? null : fail(FORBIDDEN);
   }
 
-  private log(actor: string, now: Date, action: string, reason?: string) {
+  /** Writes to the audit log. Automatic actions use "Lichess" as the actor. */
+  log(actor: string, now: Date, action: string, reason?: string) {
     this.audit.push({ at: now.toISOString(), actor, action, ...(reason ? { reason } : {}) });
   }
 
@@ -315,6 +323,8 @@ export class Store {
     this.tournament.qualifiers = ranked.slice(0, count);
     this.tournament.bracket = buildBracket(count);
     this.tournament.records = {};
+    this.play.reset();
+    this.play.sync(now);
     this.log(actor, now, `Built the bracket with ${count} qualifiers from ${ranked.length} players.`);
     return { ok: true, qualifiers: count };
   }
@@ -328,6 +338,7 @@ export class Store {
     this.tournament.qualifiers = null;
     this.tournament.swiss = null;
     this.tournament.records = {};
+    this.play.reset();
     this.log(actor, now, "Reset the bracket and cleared every result.", reason.trim());
     return ok;
   }
@@ -338,7 +349,7 @@ export class Store {
     return match ? { match, record: this.tournament.records[matchId] } : null;
   }
 
-  private label(matchId: string): string {
+  label(matchId: string): string {
     const match = this.resolved()?.matches[matchId];
     const name = (seed: number | null) =>
       seed === null ? "?" : (this.tournament.qualifiers?.[seed - 1]?.username ?? `seed ${seed}`);
@@ -362,6 +373,7 @@ export class Store {
     try {
       const next = withGame(found.match, found.record, organizerGame(outcome, reason.trim()));
       this.tournament.records[matchId] = next;
+      this.play.sync(now);
       this.log(actor, now, `Set a result by hand in ${label}, game ${next.games.length}.`, reason.trim());
       return ok;
     } catch (e) {
@@ -393,6 +405,7 @@ export class Store {
         at: now.toISOString(),
       });
       this.tournament.records[matchId] = withOverride(found.match, found.record, override);
+      this.play.sync(now);
       this.log(actor, now, `Recorded a no-show in ${label}.`, reason.trim());
       return ok;
     } catch (e) {
@@ -410,6 +423,7 @@ export class Store {
     const next = withUndo(found.record);
     if (next) this.tournament.records[matchId] = next;
     else delete this.tournament.records[matchId];
+    this.play.sync(now);
     this.log(actor, now, `Undid the last change in ${label}.`, reason.trim());
     return ok;
   }
