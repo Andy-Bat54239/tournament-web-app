@@ -146,8 +146,12 @@ async function preflight() {
     note(`${key}: username`, name);
     note(`${key}: account created`, profile.createdAt ? new Date(profile.createdAt).toISOString() : "unknown");
     check(`${key}: account is in good standing`, !profile.disabled && !profile.tosViolation);
-    const teams = await api({ path: `/api/team/of/${name}` });
-    note(`${key}: teams`, (teams.json ?? []).map((t) => ({ id: t.id, name: t.name, open: t.open, leader: t.leader?.name })));
+    const teams = await api({ token: accounts[key].token, path: `/api/team/of/${name}` });
+    if (!Array.isArray(teams.json)) {
+      check(`${key}: can read its teams`, false, `status ${teams.status} ${teams.raw.slice(0, 120)}`);
+      continue;
+    }
+    note(`${key}: teams`, teams.json.map((t) => ({ id: t.id, name: t.name, open: t.open, leader: t.leader?.name })));
   }
 }
 
