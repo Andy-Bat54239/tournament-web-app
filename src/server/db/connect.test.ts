@@ -1,8 +1,8 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openPglite } from "./connect";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getSql, openPglite } from "./connect";
 import { StateRepository } from "./repository";
 
 let root: string;
@@ -11,7 +11,10 @@ beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "castle-connect-"));
 });
 
-afterEach(() => rm(root, { recursive: true, force: true }));
+afterEach(async () => {
+  vi.unstubAllEnvs();
+  await rm(root, { recursive: true, force: true });
+});
 
 describe("the local database", () => {
   it("is made in a folder that does not exist yet, folders above it included", async () => {
@@ -35,5 +38,16 @@ describe("the local database", () => {
       state: { players: ["Grace", "Ronald"] },
     });
     await second.close();
+  });
+});
+
+describe("choosing the database", () => {
+  it("refuses to run an event in production without a Postgres address, rather than keep it somewhere unsafe", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DATABASE_URL", "");
+    vi.stubEnv("ALLOW_LOCAL_DATABASE", "");
+    await expect(getSql()).rejects.toThrow(/DATABASE_URL must be set in production/);
+    // A failed attempt is not remembered: fixing the setting and trying again works.
+    await expect(getSql()).rejects.toThrow(/DATABASE_URL must be set/);
   });
 });
