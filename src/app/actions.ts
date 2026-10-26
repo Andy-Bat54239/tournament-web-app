@@ -5,6 +5,7 @@ import { unstable_rethrow } from "next/navigation";
 import { field, type Result } from "@/domain/registration";
 import type { GameOutcome } from "@/domain/match";
 import type { FormState } from "@/lib/form-state";
+import { loginMode } from "@/server/auth-config";
 import { getStore } from "@/server/instance";
 import { getLichess, getMockLichess } from "@/server/lichess";
 import type { SimulatedEvent } from "@/server/lichess/mock";
@@ -53,6 +54,8 @@ async function asUser(run: (username: string) => Promise<FormState> | FormState)
 // Login. The mock stands in for Lichess OAuth until the API checks are done.
 
 export async function mockLogin(_prev: FormState, data: FormData): Promise<FormState> {
+  // Server Actions are public endpoints, so this must refuse even when the page shows the real login.
+  if (loginMode() !== "mock") return { error: "Use Log in with Lichess." };
   if (process.env.NODE_ENV === "production" && process.env.ALLOW_MOCK_LOGIN !== "true") {
     return { error: "Log in with Lichess is not switched on yet." };
   }
