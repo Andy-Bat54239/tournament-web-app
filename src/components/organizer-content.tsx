@@ -138,7 +138,9 @@ export async function OrganizerContent() {
           sentAt={tournament.announcement?.sentAt ?? null}
         />
       )}
-      {can("admins") && <AdminsCard admins={store.admins} ended={tournament.status === "ended"} />}
+      {can("admins") && (
+        <AdminsCard admins={store.admins} ended={tournament.status === "ended"} canManage={access.superAdmin} />
+      )}
       {can("audit") && <AuditCard entries={store.audit} />}
     </>
   );

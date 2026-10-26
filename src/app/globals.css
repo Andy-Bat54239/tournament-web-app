@@ -484,3 +484,15 @@ textarea {
 .spaced-heading {
   margin-top: 16px;
 }
+
+/* One admin in the Admins card: a form of its own, set off from the next. */
+form.admin {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+form.admin h4 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
