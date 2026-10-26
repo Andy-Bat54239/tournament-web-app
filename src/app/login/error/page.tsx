@@ -34,7 +34,8 @@ const MESSAGES: Record<string, { title: string; body: string }> = {
 async function Reason({ searchParams }: Pick<PageProps<"/login/error">, "searchParams">) {
   const { reason } = await searchParams;
   // Only the fixed messages above are ever shown, never anything taken from the address.
-  const message = MESSAGES[typeof reason === "string" && reason in MESSAGES ? reason : "failed"];
+  // Own keys only: `in` would also accept names every object inherits, such as "toString".
+  const message = MESSAGES[typeof reason === "string" && Object.hasOwn(MESSAGES, reason) ? reason : "failed"];
   return (
     <div className="card">
       <p className="strong">{message.title}</p>
