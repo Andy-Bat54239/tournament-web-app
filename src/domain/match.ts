@@ -18,6 +18,8 @@ export interface Game {
   lichessId?: string;
   /** Required when an organizer set the result by hand. */
   reason?: string;
+  /** ISO time the game ended. From Lichess for automatic results. Starts the next game's waiting time. */
+  endedAt?: string;
 }
 
 export const MAX_GAMES = 5;
