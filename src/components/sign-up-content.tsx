@@ -7,7 +7,7 @@ import {
   type Registration,
 } from "@/domain/registration";
 import { canWithdraw, eastTime, phaseAt, type Phase, type Schedule } from "@/domain/schedule";
-import { getStore } from "@/server/instance";
+import { readStore } from "@/server/instance";
 import { getLichess } from "@/server/lichess";
 import { getSessionUsername } from "@/server/session";
 import { ActionForm } from "./action-form";
@@ -138,7 +138,7 @@ function ConfirmedCard({
 export async function SignUpContent() {
   await connection();
   const now = new Date();
-  const store = getStore();
+  const store = await readStore();
   const schedule = store.schedule();
   const phase = phaseAt(schedule, now);
   const username = await getSessionUsername();

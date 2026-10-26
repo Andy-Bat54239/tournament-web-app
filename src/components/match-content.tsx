@@ -1,9 +1,10 @@
 import { connection } from "next/server";
 import { claimWin, getGameLink, logout, markReady, reportProblem, simulateGame } from "@/app/actions";
-import { getStore } from "@/server/instance";
+import { readStore } from "@/server/instance";
 import { getMockLichess } from "@/server/lichess";
 import { matchScreen, type MatchScreen, type PlayView } from "@/server/match-screen";
 import { getSessionUsername } from "@/server/session";
+import type { Store } from "@/server/store";
 import { ActionForm } from "./action-form";
 import { AutoSync } from "./auto-sync";
 import { Countdown } from "./countdown";
@@ -156,7 +157,7 @@ export async function MatchContent() {
     );
   }
 
-  const store = getStore();
+  const store = await readStore();
   const screen = matchScreen(store, username, now);
 
   return (
@@ -172,7 +173,7 @@ export async function MatchContent() {
   );
 }
 
-function screenFor(screen: MatchScreen, store: ReturnType<typeof getStore>) {
+function screenFor(screen: MatchScreen, store: Store) {
   switch (screen.kind) {
     case "no_bracket":
       return (

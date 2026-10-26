@@ -4,7 +4,7 @@ import { planFormat } from "@/domain/format";
 import { openMatches } from "@/domain/knockout";
 import { field, rosterCounts } from "@/domain/registration";
 import { announcementText } from "@/domain/schedule";
-import { getStore } from "@/server/instance";
+import { readStore } from "@/server/instance";
 import { getSessionUsername } from "@/server/session";
 import { LoginCard } from "./login-card";
 import {
@@ -33,7 +33,7 @@ export async function OrganizerContent() {
     );
   }
 
-  const store = getStore();
+  const store = await readStore();
   const access = store.access(username);
   const can = (p: Parameters<typeof store.can>[1]) => store.can(username, p);
   const anyAccess = access && (access.superAdmin || access.grants.some((g) => can(g)));

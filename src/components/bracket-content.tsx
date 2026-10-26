@@ -1,14 +1,15 @@
 import { connection } from "next/server";
 import { roundTitle } from "@/domain/bracket";
-import { getStore } from "@/server/instance";
+import { readStore } from "@/server/instance";
 import { MatchCard } from "./match-card";
 import { SwissTable } from "./swiss-table";
 
 /** The public live view: bracket first, Swiss standings under it. Reads live state, so use inside <Suspense>. */
 export async function BracketContent() {
   await connection();
-  const { tournament } = getStore();
-  const resolved = getStore().resolved();
+  const store = await readStore();
+  const { tournament } = store;
+  const resolved = store.resolved();
   const { bracket, qualifiers, records, swiss } = tournament;
 
   if (!bracket || !resolved || !qualifiers) {
