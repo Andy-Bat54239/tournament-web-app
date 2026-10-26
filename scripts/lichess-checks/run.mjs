@@ -163,7 +163,7 @@ async function preflight() {
     if (check("the test team exists", team.ok, `status ${team.status}`)) {
       note("team", { id: team.json.id, name: team.json.name, open: team.json.open, leader: team.json.leader?.name, members: team.json.nbMembers });
       const list = await api({ path: `/api/team/${teamId}/users`, accept: "application/x-ndjson" });
-      const members = list.raw.split("\n").filter(Boolean).map((line) => JSON.parse(line).username.toLowerCase());
+      const members = list.raw.split("\n").filter(Boolean).map((line) => JSON.parse(line).name.toLowerCase());
       for (const key of keys) check(`${key} (${accounts[key].name}) is a member of the team`, members.includes(accounts[key].name.toLowerCase()));
     }
   }
