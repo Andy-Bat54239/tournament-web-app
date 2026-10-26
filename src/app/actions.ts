@@ -217,9 +217,16 @@ export async function buildBracket(_prev: FormState, data: FormData): Promise<Fo
     if (!current.can(actor, "rounds")) return { error: "You don’t have access to that." };
     const found = await standingsFor(current, getLichess());
     if (!found.ok) return { error: found.error };
-    const result = await updateStore((store) => store.buildBracket(actor, found.standings, { qualifiers }, new Date()));
-    return result.ok ? finish(result, `Bracket built with ${result.qualifiers} qualifiers.`) : { error: result.error };
+    const hold = data.get("hold") === "on";
+    const result = await updateStore((store) => store.buildBracket(actor, found.standings, { qualifiers, hold }, new Date()));
+    const built = `Bracket built with ${result.ok ? result.qualifiers : 0} qualifiers.`;
+    return result.ok ? finish(result, hold ? `${built} It is on hold: press Start the knockout when the players are ready.` : built) : { error: result.error };
   });
+}
+
+/** Lets a knockout that was built on hold begin. */
+export async function startKnockout(): Promise<FormState> {
+  return asUser(async (actor) => finish(await updateStore((store) => store.startKnockout(actor, new Date())), "The knockout has started."));
 }
 
 export async function resetBracket(_prev: FormState, data: FormData): Promise<FormState> {
