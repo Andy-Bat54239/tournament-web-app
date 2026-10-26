@@ -98,6 +98,27 @@ knockout (16 players or fewer) needs no Swiss at all. With the stand-in Lichess 
 standings are invented. Creating the Swiss from the app is not built: it would need a team leader's token with the
 `team:write` scope, and the service token only has the two challenge scopes.
 
+**The Swiss view, the cut-off line and the bubble.** While the Swiss is being played the public Bracket page shows
+its standings, read from Lichess, and the Organizer page shows the same table under the bracket form. A line marks
+the last place that plays on (the top 16, or the top 32 at 64 players, as the field size sets it). Ranks are
+Lichess's own and are never worked out here; only players in the tournament are listed. Each row is marked:
+
+- **Through:** certain to play on. **Out:** cannot reach the line any more. These claims are proved from the
+  points, not guessed: nobody scores more than a point a round, points never go down, and a tie counts against the
+  player because Lichess's tiebreak could go either way. A test plays out thousands of random endings to check that
+  neither claim is ever wrong.
+- **Bubble:** not decided yet, and within three places of the line or level on points with it. When the Swiss is over
+  this is only the players level at the line, labelled **Tiebreak**, and a sentence names who missed the cut on
+  Lichess's tiebreak and who made it.
+
+The page brings itself up to date every 30 seconds, for a phone or a projector. The server reads Lichess for it
+through one shared reader, not once per viewer: a reading is reused for 20 seconds (5 minutes once the Swiss is
+finished), everyone who asks during a read waits for that same read, and after a failure Lichess is left alone (a
+minute after an HTTP 429) while the last good reading is shown, marked as from an earlier time. Each server
+instance has its own reader, so on serverless hosting expect about one read per instance every 20 seconds. Once the
+bracket is built, the standings kept with it are shown under the bracket and Lichess is not asked again. Building the
+bracket never uses the shared reader: it reads the final standings from Lichess itself.
+
 **Reading results without anyone looking.** While a player has the match screen open it reads their game every few
 seconds. Games that end when nobody has the page open are read by a separate pass, which looks up every match with a
 game link out, one at a time, and records finished games, aborts and odd results exactly as the match screen does.
@@ -164,12 +185,16 @@ src/domain/    The rules. Pure functions, no I/O, no framework.
   registration.ts  64 cap, waitlist, check-in, removing no-shows
   schedule.ts    everything worked out from the start time, in East Africa Time
   format.ts      field size -> Swiss rounds and cut-off; seeding for a straight knockout
+  cutoff.ts      the cut-off line: who is through, out or on the bubble, and the sentences under the table
+  swiss.ts       reading a Swiss link, where it has got to, how many rounds can still change the points
   permissions.ts roles, deny by default
   phone.ts       +256 format check
   play.ts        the waiting windows, Lichess game status -> result, who won given the colours, claim rules
 src/server/    store.ts (all state and every change, with permission checks), session.ts
   play.ts        playing a match: ready, the shared Lichess link, reading results, aborts, claims, problems
   match-screen.ts  what each player sees of their match
+  swiss.ts       the final standings the bracket is built from; the live Swiss as the pages show it
+  swiss-feed.ts  the shared, cached reader of the live Swiss (one read for everyone, backs off after a 429)
   oauth.ts       PKCE, the authorize address, the code exchange, the account lookup, revoking the token
   login.ts       the two halves of a login: start it, and finish it (state check, closed accounts)
   auth-config.ts which login is in use, and the app's own public address
@@ -204,13 +229,14 @@ These fill gaps in the brief. Each is one constant or one line, so they are chea
 11. **A no-show claim needs a referee.** The waiting player taps Claim win, and a referee confirms or turns it down.
     Results are read from Lichess every 8 seconds while a player has the match screen open, and by the background
     pass described under "The Swiss and the results".
+12. **"On the bubble" means within three places of the line, or level on points with it**, unless it is already
+    certain (through or out). Three is `BUBBLE_SPAN` in `src/domain/cutoff.ts`. The cut-off proofs assume nobody
+    scores more than one point a round (a win is one point on Lichess). If a round could be worth more, the
+    proofs in `cutOff` would need changing.
 
 ## Not built yet
 
-- **The Swiss mirror:** live standings and round status on the public page while the Swiss is being played (the
-  organizer can see the round, the public cannot yet), and the cut-off line and bubble.
 - **Creating the Swiss from the app.** It is created on Lichess by hand for now.
-- **The Swiss view:** the cut-off line and the bubble on live Swiss standings, for the organizers and the public.
 - **Rating snapshot** when sign-ups close, the two-admin edit warning, and data deletion requests.
 - **Phase 2:** the standings image, round announcement text, and push notifications.
 - **The rules, fair-play and consent wording** (the brief lists it as open). The sign-up checkbox is a placeholder.
