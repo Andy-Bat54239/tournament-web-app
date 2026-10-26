@@ -466,6 +466,11 @@ tr.out td {
   color: var(--mut);
 }
 
+/* Rows the wide layout leaves out beside the bracket, and the line that says how many. */
+tr.more {
+  display: none;
+}
+
 .msg {
   background: var(--bg);
   border: 1px solid var(--line);
@@ -584,3 +589,263 @@ ul.board li .note {
   grid-column: 1 / -1;
 }
 
+/* Only on a wide screen (see the media queries below). */
+.fullscreen,
+.tag {
+  display: none;
+}
+
+/* A match that can be played now stands out from the ones still waiting and the ones that are over. */
+.card[data-status="in_progress"] {
+  border: 2px solid var(--em);
+}
+
+.card[data-status="ready"] {
+  border: 2px solid var(--gold);
+}
+
+/*
+ * The public live view on a wide screen, such as a projector (brief, section 7F).
+ *
+ * The page is laid out as if the screen were about 1300 to 1400 pixels wide and then scaled up to fit it, in steps,
+ * so the text reads from across a room and the arrangement is the same on a laptop and on a 4K television. Below
+ * 1280 pixels it keeps the phone layout. `zoom` scales everything inside, including the sizes written in pixels
+ * above, and the media queries still look at the real screen.
+ */
+@media (min-width: 1280px) {
+  body:has(.live) nav,
+  body:has(.live) main {
+    max-width: none;
+  }
+
+  .live {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 19em;
+    column-gap: 20px;
+    align-items: start;
+  }
+
+  .live-main,
+  .live-full {
+    min-width: 0;
+  }
+
+  /* Alone on the row: no Swiss to put beside it, or a bracket too wide to share the row. */
+  .live-main.alone,
+  .live-full {
+    grid-column: 1 / -1;
+  }
+
+  /* The rounds run across the page. Each column is spread over the height of the tallest, so a match sits level
+     with the two matches that feed it. */
+  .rounds {
+    display: flex;
+    gap: 14px;
+    align-items: stretch;
+  }
+
+  .round {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .slots {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 10px;
+  }
+
+  .slots > .card {
+    margin: 0;
+    padding: 8px 12px;
+  }
+
+  /* The line under the page on a phone moves above it here, with the Full screen button at its other end. */
+  .live-status {
+    order: -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .live-status .note {
+    margin: 0;
+  }
+
+  .fullscreen {
+    display: inline-flex;
+    margin-left: auto;
+    min-height: 32px;
+    padding: 4px 12px;
+    font-size: 14px;
+  }
+
+  /* A card is just the two players and the score. Where the match stands is said by the tag on its edge, and who won
+     by the weight of the name. A note stays only when it explains something unusual (the .why ones). */
+  .slots .note:not(.why),
+  .slots .adv:not(.why) {
+    display: none;
+  }
+
+  .slots .card {
+    position: relative;
+  }
+
+  .tag {
+    display: block;
+    position: absolute;
+    top: -9px;
+    right: 10px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: var(--bg);
+    border: 1.5px solid var(--line);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.5;
+  }
+
+  .card[data-status="in_progress"] .tag {
+    border-color: var(--em);
+    color: var(--em);
+  }
+
+  .card[data-status="ready"] .tag {
+    border-color: var(--gold);
+  }
+
+  .slots .pl.w .nm {
+    font-weight: 600;
+  }
+
+  .slots .card[data-status="decided"] .pl:not(.w) {
+    color: var(--mut);
+  }
+
+  /* The standings beside the bracket are for glancing at, and have to share the height with it. */
+  .live-side table,
+  .live-side .note {
+    font-size: 13px;
+  }
+
+  .live-side td,
+  .live-side th {
+    padding-block: 2px;
+  }
+
+  .live-side th {
+    white-space: nowrap;
+  }
+
+  .live-side tr.far {
+    display: none;
+  }
+
+  .live-side tr.more {
+    display: table-row;
+    color: var(--mut);
+  }
+
+  /* The column heading already names the round, so a card's own title is kept for screen readers only. */
+  .slots h3,
+  .live-full .standings thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .slots .pl {
+    gap: 8px;
+    padding: 3px 0;
+  }
+
+  .slots .sd {
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+  }
+
+  /* The score says how the games went. The game by game lines stay on the phone. */
+  .slots .log {
+    display: none;
+  }
+
+  /* With the whole width, a long table of standings runs in columns (as many as .standings asks for) rather than
+     in one long strip. Each row becomes a grid so that it can break between columns whole. */
+  .live-full .standings tbody {
+    display: block;
+    columns: 18em var(--cols, 1);
+    column-gap: 28px;
+  }
+
+  .live-full .standings tr {
+    display: grid;
+    grid-template-columns: 2em minmax(0, 1fr) 2.4em 4.8em;
+    break-inside: avoid;
+  }
+
+  /* A long name wraps inside its column instead of running into the next one. */
+  .live-full .standings td:nth-child(2) {
+    overflow-wrap: anywhere;
+  }
+
+  .live-full .standings tr.more {
+    display: none;
+  }
+
+  .live-full .standings tr.cutline td {
+    grid-column: 1 / -1;
+  }
+
+  /* Full screen (the button on the page): the page is all there is, so the header and the tabs go. */
+  :root:fullscreen header,
+  :root:fullscreen nav,
+  :root:fullscreen .fullscreen {
+    display: none;
+  }
+
+  :root:fullscreen main {
+    padding-block: 8px;
+  }
+}
+
+@media (min-width: 1600px) {
+  body:has(.live) {
+    zoom: 1.15;
+  }
+}
+
+@media (min-width: 1920px) {
+  body:has(.live) {
+    zoom: 1.35;
+  }
+}
+
+@media (min-width: 2560px) {
+  body:has(.live) {
+    zoom: 1.8;
+  }
+}
+
+@media (min-width: 3200px) {
+  body:has(.live) {
+    zoom: 2.25;
+  }
+}
+
+@media (min-width: 3840px) {
+  body:has(.live) {
+    zoom: 2.7;
+  }
+}

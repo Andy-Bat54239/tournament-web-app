@@ -1,4 +1,5 @@
-import { cutNotes, type CutRow, type CutView } from "@/domain/cutoff";
+import type { CSSProperties } from "react";
+import { cutNotes, standingsColumns, type CutRow, type CutView } from "@/domain/cutoff";
 import { eastTime } from "@/domain/schedule";
 import type { SwissStandings } from "@/server/swiss";
 
@@ -16,11 +17,18 @@ function fateLabel(row: CutRow, finished: boolean): string | null {
   }
 }
 
+/** Beside the bracket on a wide screen, the standings stop this many places below the line, so they fit its height. */
+const SHOWN_BELOW_LINE = 3;
+
 function Standings({ view }: { view: CutView }) {
   const lastInside = view.rows.findLastIndex((row) => row.inside);
   const showLine = view.cutPoints !== null;
+  const lastShown = lastInside + SHOWN_BELOW_LINE;
+  const unshown = Math.max(view.rows.length - 1 - lastShown, 0);
+  // Where the page is wide and the table has the whole width, the stylesheet splits it into this many columns.
+  const columns = { "--cols": standingsColumns(view.rows.length) } as CSSProperties;
   return (
-    <div className="scroll">
+    <div className="scroll standings" style={columns}>
       <table>
         <thead>
           <tr>
@@ -34,7 +42,7 @@ function Standings({ view }: { view: CutView }) {
           {view.rows.flatMap((row, i) => {
             const label = fateLabel(row, view.finished);
             const cells = (
-              <tr key={row.username} className={row.fate}>
+              <tr key={row.username} className={i > lastShown ? `${row.fate} far` : row.fate}>
                 <td>{row.rank}</td>
                 <td>{row.username}</td>
                 <td>{row.points}</td>
@@ -50,6 +58,11 @@ function Standings({ view }: { view: CutView }) {
                 ]
               : [cells];
           })}
+          {unshown > 0 && (
+            <tr className="more">
+              <td colSpan={4}>and {unshown} more below the line</td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

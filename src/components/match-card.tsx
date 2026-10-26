@@ -70,9 +70,14 @@ export function MatchCard({
 }) {
   const { hi, lo, score, winner } = match;
   const decidedWithoutWinner = match.status === "decided" && winner === null;
+  // A winner who got through some way other than the games is worth saying, even where the notes are left out.
+  const advancedBecause = winner !== null ? advancesNote(match.decidedBy, isFinal) : "";
 
   return (
-    <section className="card">
+    <section className="card" data-status={match.status}>
+      {(match.status === "ready" || match.status === "in_progress") && (
+        <span className="tag">{match.status === "ready" ? "Ready to play" : "In progress"}</span>
+      )}
       <h3>{match.title}</h3>
       {hi !== null && lo !== null ? (
         <>
@@ -112,15 +117,15 @@ export function MatchCard({
       )}
       {match.status === "ready" && !score?.next && <p className="note tight">Game 1 next.</p>}
       {winner !== null && (
-        <p className="adv">
-          {[nameOf(names, winner), "advances", advancesNote(match.decidedBy, isFinal)].filter(Boolean).join(" ")}.
+        <p className={advancedBecause ? "adv why" : "adv"}>
+          {[nameOf(names, winner), "advances", advancedBecause].filter(Boolean).join(" ")}.
         </p>
       )}
       {decidedWithoutWinner && match.decidedBy === "double_no_show" && (
-        <p className="note tight">Neither player showed. Both are out.</p>
+        <p className="note tight why">Neither player showed. Both are out.</p>
       )}
       {decidedWithoutWinner && match.decidedBy === "empty" && (
-        <p className="note tight">No players reach this match.</p>
+        <p className="note tight why">No players reach this match.</p>
       )}
     </section>
   );
