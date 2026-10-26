@@ -39,7 +39,7 @@ person to Lichess and back; the typed-username form is gone, and the server refu
 Nothing is registered with Lichess. The app asks for **no permissions**, only for who the person is, and revokes the
 token the moment it has the username, so it never keeps one.
 
-In production, set `DATABASE_URL`, `APP_URL` (https, no path), `SESSION_SECRET`, `LICHESS_MODE=live`, `LICHESS_SERVICE_TOKEN`, and
+In production, set `DATABASE_URL`, `CRON_SECRET` (or `BACKGROUND_SYNC=true`), `APP_URL` (https, no path), `SESSION_SECRET`, `LICHESS_MODE=live`, `LICHESS_SERVICE_TOKEN`, and
 `SUPER_ADMIN` as **Joel's real Lichess username**, because the super admin is whoever logs in with that name.
 
 To run the checks against the real Lichess with the throwaway test accounts (skipped by default):
@@ -85,6 +85,33 @@ Postgres table, `tournament_state`, with a version number. It is made on first u
   appears (for example reporting across events).
 - **Tests:** the repository tests run on PGlite and on the `pg` driver over the real Postgres protocol. To run them
   against a real server too: `DATABASE_TEST_URL=postgres://... npm test`.
+
+## The Swiss and the results
+
+**The Swiss.** Lichess runs the Swiss, as the brief says. Joel (or another leader of the Castle Connect team)
+creates it on Lichess, inside the team, with the signed-up players allowed in. In the app, an organizer with the
+*rounds* permission pastes the Swiss link into the box on the Organizer page. The app checks with Lichess that it
+exists, shows how far it has got ("Round 3 of 5, 14 games still being played"), and logs who chose it.
+**Build the bracket only works once Lichess says the Swiss has finished**, and then takes the final ranks exactly as
+Lichess gives them, tiebreak included. It refuses a Swiss that none of the checked-in players entered, and a straight
+knockout (16 players or fewer) needs no Swiss at all. With the stand-in Lichess no Swiss has to be chosen and the
+standings are invented. Creating the Swiss from the app is not built: it would need a team leader's token with the
+`team:write` scope, and the service token only has the two challenge scopes.
+
+**Reading results without anyone looking.** While a player has the match screen open it reads their game every few
+seconds. Games that end when nobody has the page open are read by a separate pass, which looks up every match with a
+game link out, one at a time, and records finished games, aborts and odd results exactly as the match screen does.
+It stops at once if Lichess answers HTTP 429. Switch it on one of two ways:
+
+- **A host that keeps running** (a VPS, Fly, Railway, `next start`): set `BACKGROUND_SYNC=true`. The server then reads
+  every `SYNC_EVERY_SECONDS` (20 unless set, never under 5). Do not use this on serverless hosting.
+- **Any host, including Vercel:** set `CRON_SECRET` to a long random string and have something call
+  `GET /api/sync` every minute with `Authorization: Bearer <that string>`. Vercel Cron sends that header by itself, but
+  the free plan only runs it once a day, so use a free pinger such as cron-job.org, or GitHub Actions (every 5
+  minutes at best). The address answers 503 until `CRON_SECRET` is set and 401 to anyone without it. It returns
+  `{"checked":2,"changed":1,"stopped":null,"failed":0}`.
+
+Even with neither, nothing is lost: a result is picked up when a player opens the match screen or a referee sets it.
 
 ## Layout
 
@@ -133,13 +160,15 @@ These fill gaps in the brief. Each is one constant or one line, so they are chea
 10. **Lichess game rules:** `noRematch`, `noGiveTime` and `noEarlyDraw` on, `noClaimWin` off (`GAME_RULES` in
     `src/domain/play.ts`).
 11. **A no-show claim needs a referee.** The waiting player taps Claim win, and a referee confirms or turns it down.
-    Results are read from Lichess every 8 seconds while a player has the match screen open.
+    Results are read from Lichess every 8 seconds while a player has the match screen open, and by the background
+    pass described under "The Swiss and the results".
 
 ## Not built yet
 
-- **A background reader of results.** Games are read while a player has the match screen open. A game that finishes
-  while both players have closed the page is picked up when either returns, or when a referee sets the result.
-- **Round control and the Swiss view:** starting rounds, the bubble, matches waiting or flagged.
+- **The Swiss mirror:** live standings and round status on the public page while the Swiss is being played (the
+  organizer can see the round, the public cannot yet), and the cut-off line and bubble.
+- **Creating the Swiss from the app.** It is created on Lichess by hand for now.
+- **Round control:** starting rounds, matches waiting or flagged.
 - **Admin management:** adding admins and ticking their permissions. The roles and checks exist; there is no screen.
 - **Rating snapshot** when sign-ups close, the two-admin edit warning, and data deletion requests.
 - **Phase 2:** the standings image, round announcement text, and push notifications.
