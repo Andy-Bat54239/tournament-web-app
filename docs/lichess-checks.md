@@ -8,12 +8,12 @@ third-party library docs; these are the primary sources.
 
 | # | Check | Status | Finding |
 | - | ----- | ------ | ------- |
-| 1 | Restricted link refuses a third account | **Waiting on account C** | Docs: `users` is "only these users will be allowed to join", and the first username gets White. Live, in every test game, the first name listed had White. Whether a third account is refused is not yet tested. |
+| 1 | Restricted link refuses a third account | **Verified live (API); browser half pending** | Account C (not named) and a logged-out request were both refused with "The challenge is not for you to accept", asking for a colour did not get round it, and no game was created. A and B could join, and the first name listed had White. Usernames match ignoring case. Still to do: open the real link in a browser as C and logged out. |
 | 2 | How long an unjoined challenge lasts | **Done** | Docs: 24 hours by default, `expiresAt` up to 2 weeks. Live: a challenge with `expiresAt` = now + 60 s returned 404 after expiry and could not be joined. The challenge JSON has no expiry field, so the default cannot be read back. |
 | 3 | Results by game id | **Done, one gap** | Live: `mate` and `resign` give `status` plus `winner` (`white` or `black`). `draw`, and `aborted`, have no `winner`. A fresh game reads `started`. An unfinished game's move count is delayed, so ignore it. Not yet seen: `noStart` and `timeout`. |
 | 4 | Options to stop dodging a game | **Done** | Live: `noAbort` is refused with "restricted to challenge administrators", so **aborts cannot be blocked**. Comma-separated rules are accepted. `noEarlyDraw` works: a draw agreed after 2 plies is ignored. **`noGiveTime` does not stop the add-time API**: it still added 15 seconds (measured), so it likely only removes the in-game button. `noRematch` and `noClaimWin` are untested. |
-| 5 | Swiss inside a team, and its tiebreak | **Source answers the tiebreak; creation waits on account C** | `POST /api/swiss/new/{teamId}`, scope `tournament:write`. At least 3 rounds, at most 12 tournaments a day, `rated=false` allowed, `conditions.allowList` restricts entry to named players. Final standings: `GET /api/swiss/{id}/results` with `rank, points, tieBreak, performance`. **Ranking is points, then a Sonneborn-Berger-style tiebreak, then performance** (source: `makeScore`), which matches Joel's research. |
-| 6 | A Swiss player who never moves | **Partly answered** | Source: a player who did not move is marked `absent` and is not paired in later rounds until they rejoin. How the unplayed game and a bye are scored needs a live Swiss. |
+| 5 | Swiss inside a team, and its tiebreak | **Creation verified live; tiebreak from source** | Live: the team leader created a Swiss with `POST /api/swiss/new/{teamId}` (blitz 60+3, 3 rounds, `rated=false`, `conditions.allowList` of the signed-up names), and all three accounts joined with `POST /api/swiss/{id}/join`. At least 3 rounds, at most 12 a day. Standings: `GET /api/swiss/{id}/results` with `rank, points, tieBreak, performance, absent`. **Ranking is points, then a Sonneborn-Berger-style tiebreak, then performance** (source: `makeScore`), which matches Joel's research. Not exercised live: **the Board API refuses tournament games**, so a Swiss cannot be played by script. |
+| 6 | A Swiss player who never moves | **Done live** | Nobody moved in a 3-player Swiss. Lichess ended each unplayed game by itself within about a minute (28 and 56 seconds measured): the side to move lost on time (`outoftime`) and the opponent won, with no moves played. **That player is marked `absent` and is not paired in later rounds.** A bye scored 1 point. With only one present player left the Swiss **finished early, on round 2 of 3**. |
 | 7 | 5+2 is blitz | **Verified live and in source** | Estimated duration `limit + 40 x increment` = 380 s, and blitz is 180 to 479 s. Live: a 5+2 game reports `speed: blitz`, `perf: blitz`. |
 | 8 | Rate limits | **Done at this scale** | Official rule: one request at a time, and on HTTP 429 wait at least a minute. Live, one request at a time: 60 restricted challenges created in a row and cancelled, 64 profile reads, and a `games-by-users` stream, with no 429. Swiss creation is capped at 12 a day. Bulk pairing needs every player's own token, so it is not an option. |
 
@@ -32,8 +32,15 @@ third-party library docs; these are the primary sources.
   who is at fault, and how many times it can happen.
 - **A no-show is best handled before a game exists.** If a player never opens the link, no game has started, only an
   open challenge, and the app can cancel it with its own token. Once both have joined, only a player can abort.
-- **The Board API cannot play ultrabullet.** Games at 15 seconds are refused ("cannot be played with the Board API"),
-  and cannot be ended through the API either. Test clocks must be blitz or slower.
+- **The Board API cannot play ultrabullet, or any tournament game.** Games at 15 seconds, and every Swiss game, are
+  refused ("cannot be played with the Board API"). Test clocks must be blitz or slower, and Swiss games must be
+  played on lichess.org.
+- **In the Swiss, a missed first move costs the game and the seat.** Lichess flags the side to move within about a
+  minute, marks that player `absent`, and does not pair them again unless they rejoin on lichess.org. Rules text for
+  players should say so.
+- **A Swiss can end early.** If fewer than two present players remain, Lichess finishes it, and `nbRounds` shrinks to
+  the rounds played. Read `status`, `round` and `nbRounds` from Lichess instead of assuming 5 rounds, and take the final
+  ranks only when `status` is `finished`.
 
 ## What this changes in the design
 
@@ -48,5 +55,6 @@ third-party library docs; these are the primary sources.
 
 ## Still to do
 
-The restricted-link check (API and browser), then the Swiss checks (5 and 6). Both need three distinct accounts. See
-`scripts/lichess-checks/README.md`.
+- The browser half of the restricted-link check: open the link as an unnamed account and logged out.
+- Optional: a Swiss played by hand on lichess.org with a deliberate three-way tie, to see the tiebreak order live. The
+  source already answers it, and the app only reads Lichess's `rank`.
