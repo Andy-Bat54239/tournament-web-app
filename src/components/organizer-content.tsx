@@ -13,6 +13,7 @@ import {
   AuditCard,
   BracketCard,
   DeskCard,
+  RefereeCard,
   ResultsCard,
   ScheduleCard,
 } from "./organizer-cards";
@@ -21,6 +22,7 @@ import type { MatchOption } from "./results-form";
 /** Organizer tools. Each card shows only if the viewer has that permission; the store enforces it again on every change. */
 export async function OrganizerContent() {
   await connection();
+  const now = new Date();
   const username = await getSessionUsername();
   if (!username) {
     return (
@@ -88,6 +90,7 @@ export async function OrganizerContent() {
       : [];
 
   const { date, time } = store.startInputs();
+  const desk = store.play.desk(now);
 
   return (
     <>
@@ -99,6 +102,9 @@ export async function OrganizerContent() {
           players={players.length}
           built={tournament.qualifiers?.length ?? null}
         />
+      )}
+      {(can("result") || can("forfeit")) && (
+        <RefereeCard items={desk.items} problems={desk.problems} canDecide={can("forfeit")} />
       )}
       {(can("result") || can("forfeit")) && (
         <ResultsCard options={matchOptions} canResult={can("result")} canForfeit={can("forfeit")} />

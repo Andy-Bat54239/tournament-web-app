@@ -5,12 +5,14 @@ import {
   endTournament,
   removeNoShows,
   resetBracket,
+  settleMatch,
 } from "@/app/actions";
 import type { FormatPlan } from "@/domain/format";
 import { PERMISSION_LABELS } from "@/domain/permissions";
 import { formatUgandaPhone } from "@/domain/phone";
 import type { Registration, RosterCounts } from "@/domain/registration";
 import { formatWhen } from "@/domain/schedule";
+import type { DeskItem, DeskProblem } from "@/server/play";
 import type { AdminRecord, AuditEntry } from "@/server/store";
 import { ActionForm } from "./action-form";
 import { ResultsForm, type MatchOption } from "./results-form";
@@ -100,6 +102,86 @@ export function ResultsCard({
         <p className="note tight">No open matches.</p>
       ) : (
         <ResultsForm options={options} canResult={canResult} canForfeit={canForfeit} />
+      )}
+    </div>
+  );
+}
+
+/** Claims, matches past their waiting time, odd Lichess results, repeated aborts, and reported problems. */
+export function RefereeCard({
+  items,
+  problems,
+  canDecide,
+}: {
+  items: readonly DeskItem[];
+  problems: readonly DeskProblem[];
+  canDecide: boolean;
+}) {
+  return (
+    <div className="card">
+      <h3>Matches that need a referee</h3>
+      {items.length === 0 ? (
+        <p className="note tight">Nothing needs a referee right now.</p>
+      ) : (
+        items.map((item) => (
+          <div key={item.matchId} className="desk-item">
+            <p className="strong">
+              {item.title}, game {item.game}
+            </p>
+            <p>
+              {item.hi.name} ({item.hi.ready ? "ready" : "not ready"}) v {item.lo.name} ({item.lo.ready ? "ready" : "not ready"})
+            </p>
+            <ul className="log bare">
+              {item.reasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+            {canDecide && (item.claim || (item.windowOver && !item.joined)) && (
+              <ActionForm action={settleMatch}>
+                <input type="hidden" name="matchId" value={item.matchId} />
+                <div className="btns">
+                  {item.claim ? (
+                    <>
+                      <SubmitButton name="do" value="confirm">
+                        Give the win to {item.claim.byName}
+                      </SubmitButton>
+                      <SubmitButton name="do" value="reject" className="quiet">
+                        Turn the claim down
+                      </SubmitButton>
+                    </>
+                  ) : (
+                    <>
+                      <SubmitButton name="do" value="hi">
+                        Only {item.hi.name} was here
+                      </SubmitButton>
+                      <SubmitButton name="do" value="lo">
+                        Only {item.lo.name} was here
+                      </SubmitButton>
+                      <SubmitButton name="do" value="none" className="gold">
+                        Neither was here
+                      </SubmitButton>
+                    </>
+                  )}
+                </div>
+              </ActionForm>
+            )}
+          </div>
+        ))
+      )}
+
+      <h3 className="spaced-heading">Problems reported</h3>
+      {problems.length === 0 ? (
+        <p className="note tight">None yet.</p>
+      ) : (
+        <ul className="log bare">
+          {problems.slice(0, 10).map((problem) => (
+            <li key={`${problem.matchId}-${problem.at}-${problem.by}`}>
+              <span className="when">{formatWhen(new Date(problem.at))}</span> · <b>{problem.by}</b> in {problem.title}, game{" "}
+              {problem.game}
+              {problem.late ? " (reported late)" : ""}: {problem.text}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
