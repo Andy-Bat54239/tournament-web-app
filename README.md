@@ -6,7 +6,8 @@ the Castle Connect UG tournament app brief (version 1, 22 October 2026); the loo
 clickable prototype. Neither file is in this repository.
 
 **Status: scaffold.** Sign-up, check-in, the bracket and match rules, the schedule, roles, the audit log, and the
-player match screen with its referee desk work end to end. The store is *in-memory*. Log in with Lichess is the real
+player match screen with its referee desk work end to end, and the tournament is kept in Postgres, so a restart loses
+nothing. Log in with Lichess is the real
 OAuth login (`LICHESS_LOGIN=oauth`), and game links and results can talk to the real Lichess (`LICHESS_MODE=live`);
 by default both use stand-ins so it runs with no setup. See [Not built yet](#not-built-yet).
 
@@ -38,7 +39,7 @@ person to Lichess and back; the typed-username form is gone, and the server refu
 Nothing is registered with Lichess. The app asks for **no permissions**, only for who the person is, and revokes the
 token the moment it has the username, so it never keeps one.
 
-In production, set `APP_URL` (https, no path), `SESSION_SECRET`, `LICHESS_MODE=live`, `LICHESS_SERVICE_TOKEN`, and
+In production, set `DATABASE_URL`, `APP_URL` (https, no path), `SESSION_SECRET`, `LICHESS_MODE=live`, `LICHESS_SERVICE_TOKEN`, and
 `SUPER_ADMIN` as **Joel's real Lichess username**, because the super admin is whoever logs in with that name.
 
 To run the checks against the real Lichess with the throwaway test accounts (skipped by default):
@@ -56,13 +57,34 @@ LICHESS_LIVE_TESTS=1 npx vitest run src/server/lichess/http.live.test.ts
 | Rendering | Partial Prerender (Cache Components)  | Every page is a static shell with the live part streamed in, which suits phones on mobile data.  |
 | Styling   | Plain CSS, brand tokens               | Light pages, no UI library. Emerald, gold and cream, with a dark mode.                            |
 | Lichess   | One interface; a mock and a live client | Develop and demo on the mock, run a real event on the live client (`LICHESS_MODE=live`).        |
-| Data      | In-memory `Store` class               | Stand-in for Postgres, so the swap stays in one file.                                             |
+| Data      | Postgres: one versioned JSON document | `pg` in production, PGlite (real Postgres in a folder) locally. Saves are checked, see below.      |
 | Login     | Signed `httpOnly` cookie              | The username only ever comes from the Lichess login, never from a typed field.                    |
 | Tests     | Vitest                                | Fast, no setup, runs the domain code in plain Node.                                               |
 
 **Hosting suggestion (not decided):** Vercel plus a hosted Postgres such as Neon, both of which have free tiers.
-Check their current limits against 64 players. The in-memory store must be replaced first, because serverless
-instances do not share memory and a restart empties it.
+Check their current limits against 64 players. Set `DATABASE_URL` to the Postgres address; nothing else is needed.
+
+## The database
+
+The whole tournament (players, bracket, results, matches in play, admins, audit log) is one JSON document in a
+Postgres table, `tournament_state`, with a version number. It is made on first use, so there is nothing to migrate.
+
+- **Production:** set `DATABASE_URL` (for example the connection string from Neon). Without it the app refuses to
+  start in production, so an event is never run on a database that is not kept safe.
+- **Development and tests:** with no `DATABASE_URL`, the app uses PGlite, a real Postgres engine in a folder
+  (`.data/pglite`, or `PGLITE_DIR`). It keeps data across restarts with nothing to install. `npm run db:reset` clears it.
+  Only one process can use that folder at a time.
+- **Two things changing at once are both kept.** Pages read a copy of the state. Every change goes through
+  `updateStore` (`src/server/provider.ts`), which saves only if nobody else saved since it read, and otherwise runs the
+  change again on the newer state. Changes that did nothing (a poll that found no news) save nothing. A change that
+  gives up after six tries tells the person to try again.
+- **`TOURNAMENT_START`, `TOURNAMENT_CAP` and `SEED_DEMO`** only decide how the tournament starts the first time the
+  app runs against an empty database. After that the saved tournament wins, and the start time is changed in the app.
+- **Why one document and not many tables:** one event, 64 players, and every change touches several things that must
+  agree. A single versioned save makes that simple and safe. Splitting it into tables is possible later if a reason
+  appears (for example reporting across events).
+- **Tests:** the repository tests run on PGlite and on the `pg` driver over the real Postgres protocol. To run them
+  against a real server too: `DATABASE_TEST_URL=postgres://... npm test`.
 
 ## Layout
 
@@ -117,7 +139,6 @@ These fill gaps in the brief. Each is one constant or one line, so they are chea
 
 - **A background reader of results.** Games are read while a player has the match screen open. A game that finishes
   while both players have closed the page is picked up when either returns, or when a referee sets the result.
-- **A database.** All state is lost when the server restarts.
 - **Round control and the Swiss view:** starting rounds, the bubble, matches waiting or flagged.
 - **Admin management:** adding admins and ticking their permissions. The roles and checks exist; there is no screen.
 - **Rating snapshot** when sign-ups close, the two-admin edit warning, and data deletion requests.
