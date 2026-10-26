@@ -49,7 +49,7 @@ All of this is now built: see `src/domain/play.ts`, `src/server/play.ts` and the
 - **Colours.** Put the higher seed first in `users` for games 1, 3 and 5, and the lower seed first for games 2 and 4.
 - **Reading results.** Watch `games-by-users` for finishes (one connection), then fetch each finished game by id.
   Send requests one at a time through a single queue, and back off for a full minute on a 429.
-- **Login.** Logging in needs no OAuth scope: the username and rating are public. Players never hand over a token.
+- **Login.** Logging in needs no OAuth scope: `GET /api/account` works with a token that has none. Players never hand over a token the app keeps: it is revoked at once. Built: see `src/server/login.ts`.
 - **Usernames** come back in display case (`Lichess`) with a lowercase `id`. Match them case-insensitively, as the app does.
 - **Swiss entry.** Use `conditions.allowList` to admit only the signed-up players.
 - **Team membership** is public: `GET /api/team/{id}/users` lists members without a token. `GET /api/team/of/{username}`

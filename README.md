@@ -6,9 +6,9 @@ the Castle Connect UG tournament app brief (version 1, 22 October 2026); the loo
 clickable prototype. Neither file is in this repository.
 
 **Status: scaffold.** Sign-up, check-in, the bracket and match rules, the schedule, roles, the audit log, and the
-player match screen with its referee desk work end to end. The store is *in-memory*, and Lichess login is still a
-*stand-in*. Game links and results can talk to the real Lichess (`LICHESS_MODE=live`) and are checked against it; by
-default a mock is used. See [Not built yet](#not-built-yet).
+player match screen with its referee desk work end to end. The store is *in-memory*. Log in with Lichess is the real
+OAuth login (`LICHESS_LOGIN=oauth`), and game links and results can talk to the real Lichess (`LICHESS_MODE=live`);
+by default both use stand-ins so it runs with no setup. See [Not built yet](#not-built-yet).
 
 ## Run it
 
@@ -30,6 +30,16 @@ players signed up for Sunday 1 November 2026, 14:00. To see a bracket the size o
 build it with 8 qualifiers, then log in as one of the two players of the first match and open **My match**. With the
 mock Lichess a development-only panel plays the part of both players (join, win, draw, abort), so every state can be
 reached by hand. Copy [`.env.example`](.env.example) to change any of this, including `LICHESS_MODE=live`.
+
+### The real "Log in with Lichess"
+
+Add `LICHESS_LOGIN=oauth` to a git-ignored `.env.local` and restart. The login card becomes one button that sends the
+person to Lichess and back; the typed-username form is gone, and the server refuses it even if called directly.
+Nothing is registered with Lichess. The app asks for **no permissions**, only for who the person is, and revokes the
+token the moment it has the username, so it never keeps one.
+
+In production, set `APP_URL` (https, no path), `SESSION_SECRET`, `LICHESS_MODE=live`, `LICHESS_SERVICE_TOKEN`, and
+`SUPER_ADMIN` as **Joel's real Lichess username**, because the super admin is whoever logs in with that name.
 
 To run the checks against the real Lichess with the throwaway test accounts (skipped by default):
 
@@ -70,8 +80,12 @@ src/domain/    The rules. Pure functions, no I/O, no framework.
 src/server/    store.ts (all state and every change, with permission checks), session.ts
   play.ts        playing a match: ready, the shared Lichess link, reading results, aborts, claims, problems
   match-screen.ts  what each player sees of their match
+  oauth.ts       PKCE, the authorize address, the code exchange, the account lookup, revoking the token
+  login.ts       the two halves of a login: start it, and finish it (state check, closed accounts)
+  auth-config.ts which login is in use, and the app's own public address
   lichess/       the interface, a mock (with a simulator), and the live client (http.ts)
-src/app/       pages (/, /bracket, /match, /organizer) and actions.ts (Server Actions)
+src/app/       pages (/, /bracket, /match, /organizer, /login/error), api/auth/lichess (the login routes)
+               and actions.ts (Server Actions)
 src/components/
 ```
 
@@ -101,8 +115,6 @@ These fill gaps in the brief. Each is one constant or one line, so they are chea
 
 ## Not built yet
 
-- **Real Lichess login** (OAuth). Game links, results and standings already work against the real Lichess; login is
-  still a stand-in that lets anyone log in as anyone, so it is refused in production unless switched on.
 - **A background reader of results.** Games are read while a player has the match screen open. A game that finishes
   while both players have closed the page is picked up when either returns, or when a referee sets the result.
 - **A database.** All state is lost when the server restarts.
