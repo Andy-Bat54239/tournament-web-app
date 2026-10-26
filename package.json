@@ -8,16 +8,21 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "db:reset": "node -e \"require('node:fs').rmSync('.data/pglite',{recursive:true,force:true});console.log('Local database cleared.')\""
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.12",
     "next": "16.4.3",
+    "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite-socket": "^0.2.15",
     "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
