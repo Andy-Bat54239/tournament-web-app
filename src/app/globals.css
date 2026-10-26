@@ -264,7 +264,8 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   font: inherit;
   width: 100%;
   min-height: 44px;
@@ -323,9 +324,14 @@ button.quiet {
   min-height: 40px;
 }
 
-button.wide {
+button.wide,
+.button.wide {
   width: 100%;
   margin-top: 4px;
+}
+
+.button.gold {
+  border-color: var(--gold);
 }
 
 @media (hover: hover) {
@@ -349,6 +355,7 @@ button:focus-visible,
 summary:focus-visible,
 input:focus-visible,
 select:focus-visible,
+textarea:focus-visible,
 a:focus-visible {
   outline: 3px solid var(--gold);
   outline-offset: 2px;
@@ -443,4 +450,37 @@ details summary {
   min-height: 40px;
   display: flex;
   align-items: center;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 88px;
+}
+
+.timer {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--em);
+  font-size: 1.15em;
+}
+
+.timer.over {
+  color: var(--bad);
+}
+
+.card.dev {
+  border-style: dashed;
+}
+
+.desk-item {
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.desk-item:first-of-type {
+  border-top: 0;
+}
+
+.spaced-heading {
+  margin-top: 16px;
 }
