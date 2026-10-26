@@ -154,12 +154,18 @@ async function preflight() {
     note(`${key}: username`, name);
     note(`${key}: account created`, profile.createdAt ? new Date(profile.createdAt).toISOString() : "unknown");
     check(`${key}: account is in good standing`, !profile.disabled && !profile.tosViolation);
-    const teams = await api({ token: accounts[key].token, path: `/api/team/of/${name}` });
-    if (!Array.isArray(teams.json)) {
-      check(`${key}: can read its teams`, false, `status ${teams.status} ${teams.raw.slice(0, 120)}`);
-      continue;
+  }
+
+  // Team lookup is public, by team id (the last part of the team's web address).
+  const teamId = process.argv[3];
+  if (teamId) {
+    const team = await api({ path: `/api/team/${teamId}` });
+    if (check("the test team exists", team.ok, `status ${team.status}`)) {
+      note("team", { id: team.json.id, name: team.json.name, open: team.json.open, leader: team.json.leader?.name, members: team.json.nbMembers });
+      const list = await api({ path: `/api/team/${teamId}/users`, accept: "application/x-ndjson" });
+      const members = list.raw.split("\n").filter(Boolean).map((line) => JSON.parse(line).username.toLowerCase());
+      for (const key of keys) check(`${key} (${accounts[key].name}) is a member of the team`, members.includes(accounts[key].name.toLowerCase()));
     }
-    note(`${key}: teams`, teams.json.map((t) => ({ id: t.id, name: t.name, open: t.open, leader: t.leader?.name })));
   }
 }
 

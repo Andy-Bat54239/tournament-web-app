@@ -20,7 +20,7 @@ Put the tokens in `scripts/lichess-checks/.env.local`, copied from `.env.example
 
 ```bash
 node scripts/lichess-checks/run.mjs smoke            # no tokens needed
-node scripts/lichess-checks/run.mjs preflight        # are the tokens valid, with the right scopes?
+node scripts/lichess-checks/run.mjs preflight ccug-test-team   # tokens valid, scopes right, team members? (pass your team id)
 node scripts/lichess-checks/run.mjs restricted-link  # check 1, API half
 node scripts/lichess-checks/run.mjs manual-link create   # check 1, browser half (needs a person)
 node scripts/lichess-checks/run.mjs manual-link verify
