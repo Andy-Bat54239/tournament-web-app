@@ -151,7 +151,7 @@ export async function MatchContent() {
     return (
       <>
         <p className="note">Log in with Lichess to see your match.</p>
-        <LoginCard />
+        <LoginCard next="/match" />
       </>
     );
   }

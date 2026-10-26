@@ -157,7 +157,7 @@ export async function SignUpContent() {
         schedule={schedule}
       />
       {!username ? (
-        <LoginCard />
+        <LoginCard next="/" />
       ) : me && signedUp ? (
         <ConfirmedCard
           me={me}

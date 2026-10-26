@@ -28,7 +28,7 @@ export async function OrganizerContent() {
     return (
       <>
         <p className="note">Log in with Lichess to see the organizer tools.</p>
-        <LoginCard />
+        <LoginCard next="/organizer" />
       </>
     );
   }
