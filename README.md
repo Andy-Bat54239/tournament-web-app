@@ -138,9 +138,20 @@ a wide screen:
   tabs, so the page has the whole screen. At 1920×1080 a bracket of 16 qualifiers with its standings fits one
   screen, and so does the table of a 64-player Swiss (the sentences under it may need a small scroll). A bracket of
   32 qualifiers is taller than a screen at a readable size, so it scrolls. Esc leaves full screen.
+- **Smaller and Larger** (beside Full screen, with the size shown as a percentage and a Reset once it is not 100%)
+  let the organizer set the text for the room. A size multiplies the scale the page picked for the screen: 100% is
+  what it picked, 130% is 30% bigger, and the choices run from 50% to 200% in eleven steps (`TEXT_SIZES` in
+  `src/domain/text-size.ts`). The choice is kept in this browser's storage, because it belongs to that screen and that
+  room, and a small script in the page head puts it on before the first paint so a reload does not jump. A size that
+  would leave the wide layout less than 1000 pixels of room is not offered (a 1080p screen goes up to 130%, a 1280
+  laptop up to 115%), and a size chosen on a bigger screen is held back on a smaller one without being forgotten. The
+  buttons stay on screen in full screen mode, so the size can be changed while projecting. At 1920×1080 a bracket of
+  32 qualifiers fits one screen only at 50%, which is small type. On a 4K television 50% gives the type of a 1080p
+  screen at 100%, and by the same measurements it fits (not tried on a real 4K screen).
 
-The scale follows the screen's width in CSS pixels, so the browser's own zoom (Ctrl + and Ctrl −) moves the page
-between steps rather than scaling it smoothly: it can make the type a little smaller before it makes it bigger.
+The scale picked for the screen follows its width in CSS pixels, so the browser's own zoom (Ctrl + and Ctrl −) moves
+the page between steps rather than scaling it smoothly: it can make the type a little smaller before it makes it
+bigger. Use the size buttons instead.
 
 **Reading results without anyone looking.** While a player has the match screen open it reads their game every few
 seconds. Games that end when nobody has the page open are read by a separate pass, which looks up every match with a
@@ -210,6 +221,7 @@ src/domain/    The rules. Pure functions, no I/O, no framework.
   format.ts      field size -> Swiss rounds and cut-off; seeding for a straight knockout
   cutoff.ts      the cut-off line: who is through, out or on the bubble, the sentences under the table, and how many
                  columns a long table of standings gets on a wide screen
+  text-size.ts   the text sizes the organizer can pick for the projector view, and how many the screen has room for
   swiss.ts       reading a Swiss link, where it has got to, how many rounds can still change the points
   permissions.ts roles, deny by default
   phone.ts       +256 format check
@@ -264,5 +276,5 @@ These fill gaps in the brief. Each is one constant or one line, so they are chea
 - **Rating snapshot** when sign-ups close, the two-admin edit warning, and data deletion requests.
 - **Phase 2:** the standings image, round announcement text, and push notifications.
 - **The rules, fair-play and consent wording** (the brief lists it as open). The sign-up checkbox is a placeholder.
-- **A smooth text-size control for the projector.** The wide layout scales in steps from the screen's width and has
-  no size buttons of its own. A bracket of 32 qualifiers scrolls on a 1080p screen.
+- **A bracket of 32 qualifiers on one 1080p screen at a readable size.** It is taller than the screen, so it scrolls
+  (or is read at 50%).
