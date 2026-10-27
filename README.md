@@ -42,6 +42,10 @@ token the moment it has the username, so it never keeps one.
 In production, set `DATABASE_URL`, `CRON_SECRET` (or `BACKGROUND_SYNC=true`), `APP_URL` (https, no path), `SESSION_SECRET`, `LICHESS_MODE=live`, `LICHESS_SERVICE_TOKEN`, and
 `SUPER_ADMIN` as **Joel's real Lichess username**, because the super admin is whoever logs in with that name.
 
+To try the whole thing on a real host with real accounts before the event, follow
+[`docs/dress-rehearsal.md`](docs/dress-rehearsal.md): a deploy checklist, a step-by-step rehearsal script, and what to
+do when something does not work.
+
 To run the checks against the real Lichess with the throwaway test accounts (skipped by default):
 
 ```bash
