@@ -590,7 +590,7 @@ ul.board li .note {
 }
 
 /* Only on a wide screen (see the media queries below). */
-.fullscreen,
+.live-controls,
 .tag {
   display: none;
 }
@@ -611,8 +611,16 @@ ul.board li .note {
  * so the text reads from across a room and the arrangement is the same on a laptop and on a 4K television. Below
  * 1280 pixels it keeps the phone layout. `zoom` scales everything inside, including the sizes written in pixels
  * above, and the media queries still look at the real screen.
+ *
+ * The scale is --step, picked by the screen's width in the blocks below, times --size, the organizer's choice
+ * with the Smaller and Larger buttons (1 when none was made). The buttons read --step, so keep that name.
  */
 @media (min-width: 1280px) {
+  body:has(.live) {
+    --step: 1;
+    zoom: calc(var(--step) * var(--size, 1));
+  }
+
   body:has(.live) nav,
   body:has(.live) main {
     max-width: none;
@@ -678,9 +686,27 @@ ul.board li .note {
     margin: 0;
   }
 
-  .fullscreen {
-    display: inline-flex;
+  .live-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
     margin-left: auto;
+  }
+
+  .textsize {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .textsize .note {
+    margin: 0;
+    min-width: 3.4em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .live-controls button {
     min-height: 32px;
     padding: 4px 12px;
     font-size: 14px;
@@ -822,30 +848,30 @@ ul.board li .note {
 
 @media (min-width: 1600px) {
   body:has(.live) {
-    zoom: 1.15;
+    --step: 1.15;
   }
 }
 
 @media (min-width: 1920px) {
   body:has(.live) {
-    zoom: 1.35;
+    --step: 1.35;
   }
 }
 
 @media (min-width: 2560px) {
   body:has(.live) {
-    zoom: 1.8;
+    --step: 1.8;
   }
 }
 
 @media (min-width: 3200px) {
   body:has(.live) {
-    zoom: 2.25;
+    --step: 2.25;
   }
 }
 
 @media (min-width: 3840px) {
   body:has(.live) {
-    zoom: 2.7;
+    --step: 2.7;
   }
 }

@@ -3,6 +3,7 @@ import { Outfit } from "next/font/google";
 import { Suspense } from "react";
 import { Nav } from "@/components/nav";
 import { ScheduleBanner, StartsLine } from "@/components/schedule-header";
+import { savedSizeScript } from "@/domain/text-size";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -28,7 +29,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={outfit.variable}>
+    // The saved text size is put on <html> before the page is painted, which React did not render, hence the flag. It
+    // is a plain script in the head because next/script queues its inline scripts until Next's own code has loaded.
+    <html lang="en" className={outfit.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: savedSizeScript() }} />
+      </head>
       <body>
         <header>
           <h1>Castle Connect UG</h1>

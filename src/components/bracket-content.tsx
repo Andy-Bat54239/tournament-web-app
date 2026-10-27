@@ -8,6 +8,7 @@ import { AutoRefresh } from "./auto-refresh";
 import { FullScreenButton } from "./full-screen-button";
 import { MatchCard } from "./match-card";
 import { SwissTable } from "./swiss-table";
+import { TextSizeButtons } from "./text-size-buttons";
 
 /** How often the public view brings itself up to date, for a phone left open or a projector. */
 const REFRESH_MS = 30_000;
@@ -37,7 +38,10 @@ export async function BracketContent() {
   const status = (refreshing: boolean) => (
     <div className="live-full live-status">
       {refreshing && <p className="note tight">This page updates by itself every {REFRESH_MS / 1000} seconds.</p>}
-      <FullScreenButton />
+      <div className="live-controls">
+        <TextSizeButtons />
+        <FullScreenButton />
+      </div>
       {refreshing && <AutoRefresh everyMs={REFRESH_MS} />}
     </div>
   );
