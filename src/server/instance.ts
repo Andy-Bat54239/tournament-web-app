@@ -2,6 +2,7 @@ import "server-only";
 import { PRESETS } from "@/domain/permissions";
 import type { Registration } from "@/domain/registration";
 import { HARD_CAP } from "@/domain/registration";
+import { superAdminName } from "./auth-config";
 import { getSql } from "./db/connect";
 import { StateRepository } from "./db/repository";
 import { getLichess } from "./lichess";
@@ -29,7 +30,7 @@ function config() {
   return {
     startsAt: (Number.isNaN(start.getTime()) ? new Date(DEFAULT_START) : start).toISOString(),
     cap: Number.isInteger(cap) && cap >= 2 && cap <= HARD_CAP ? cap : HARD_CAP,
-    superAdmin: process.env.SUPER_ADMIN ?? (production ? null : "Joel"),
+    superAdmin: superAdminName(),
     seedDemo: (process.env.SEED_DEMO ?? String(!production)) === "true",
   };
 }

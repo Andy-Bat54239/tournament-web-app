@@ -1,4 +1,5 @@
 import "server-only";
+import { sameUser } from "@/domain/registration";
 import { CALLBACK_PATH, DEFAULT_CLIENT_ID } from "./oauth";
 
 /**
@@ -38,3 +39,38 @@ export function appOrigin(requestUrl: string): string {
 }
 
 export const redirectUri = (requestUrl: string) => `${appOrigin(requestUrl)}${CALLBACK_PATH}`;
+
+/**
+ * The super admin signs in with a username and a password, not with Lichess. SUPER_ADMIN is the username. Outside
+ * production it defaults to "Joel", so a local copy works with nothing set.
+ */
+export function superAdminName(): string | null {
+  const chosen = process.env.SUPER_ADMIN?.trim();
+  if (chosen) return chosen;
+  return process.env.NODE_ENV === "production" ? null : "Joel";
+}
+
+/** The password for the local copy only. Production never accepts it: there, the hash below has to be set. */
+export const DEV_ADMIN_PASSWORD = "dev-password";
+
+/**
+ * How the super admin's password is checked: against SUPER_ADMIN_PASSWORD_HASH (made by `npm run hash-password`), or,
+ * outside production and with no hash set, against the development password. Null in production with no hash, which
+ * turns the super admin's sign-in off, so nobody can get in until it is set.
+ */
+export type AdminPassword = { kind: "hash"; hash: string } | { kind: "development" };
+
+export function adminPassword(): AdminPassword | null {
+  const hash = process.env.SUPER_ADMIN_PASSWORD_HASH?.trim();
+  if (hash) return { kind: "hash", hash };
+  return process.env.NODE_ENV === "production" ? null : { kind: "development" };
+}
+
+/**
+ * The super admin's name can never be used to log in with Lichess. Somebody who owns a Lichess account with the same
+ * name would otherwise be the super admin.
+ */
+export function isSuperAdminName(username: string): boolean {
+  const name = superAdminName();
+  return name !== null && sameUser(username, name);
+}

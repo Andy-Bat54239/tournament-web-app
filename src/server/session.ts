@@ -1,6 +1,8 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { superAdminName } from "./auth-config";
+import { actorFor, type SessionIdentity } from "./identity";
 import type { LoginFlow } from "./oauth";
 
 /**
@@ -54,14 +56,23 @@ function unseal(value: string | undefined): Record<string, unknown> | null {
 const expiry = (nowMs: number, seconds: number) => Math.floor(nowMs / 1000) + seconds;
 const stillValid = (exp: unknown, nowMs: number) => typeof exp === "number" && exp * 1000 > nowMs;
 
-export function encodeSession(username: string, nowMs: number): string {
-  return seal({ u: username, exp: expiry(nowMs, MAX_AGE_SECONDS) });
+/**
+ * `admin` is for the super admin's own sign-in, with a password. Everyone else, the referees and the check-in desk
+ * included, has a Lichess session, which can never be the super admin's (see `actorFor`).
+ */
+export function encodeSession(username: string, nowMs: number, kind: "lichess" | "admin" = "lichess"): string {
+  return seal({ u: username, ...(kind === "admin" ? { k: "admin" } : {}), exp: expiry(nowMs, MAX_AGE_SECONDS) });
+}
+
+/** Who a session cookie says it is, and how they signed in. A cookie from before there were two kinds is a Lichess one. */
+export function decodeIdentity(value: string | undefined, nowMs: number): SessionIdentity | null {
+  const data = unseal(value);
+  if (!data || typeof data.u !== "string" || !stillValid(data.exp, nowMs)) return null;
+  return { username: data.u, admin: data.k === "admin" };
 }
 
 export function decodeSession(value: string | undefined, nowMs: number): string | null {
-  const data = unseal(value);
-  if (!data || typeof data.u !== "string" || !stillValid(data.exp, nowMs)) return null;
-  return data.u;
+  return decodeIdentity(value, nowMs)?.username ?? null;
 }
 
 export function encodeFlow(flow: LoginFlow, nowMs: number): string {
@@ -80,15 +91,18 @@ export const sessionCookieOptions = () => ({ ...base(), path: "/", maxAge: MAX_A
 /** Lax, so it comes back with the redirect from Lichess; scoped to the login routes, so nothing else sees it. */
 export const flowCookieOptions = () => ({ ...base(), path: "/api/auth/lichess", maxAge: FLOW_MAX_AGE_SECONDS });
 
-export async function setSession(username: string): Promise<void> {
-  (await cookies()).set(SESSION_COOKIE, encodeSession(username, Date.now()), sessionCookieOptions());
+export async function setSession(username: string, kind: "lichess" | "admin" = "lichess"): Promise<void> {
+  (await cookies()).set(SESSION_COOKIE, encodeSession(username, Date.now(), kind), sessionCookieOptions());
 }
 
 export async function clearSession(): Promise<void> {
   (await cookies()).delete(SESSION_COOKIE);
 }
 
-/** The logged-in Lichess username, or null. Reads cookies, so call it behind <Suspense>. */
+/**
+ * Who is logged in, or null: a Lichess username, or the super admin's name for the super admin. A session that does not
+ * fit the rules in `actorFor` counts as nobody. Reads cookies, so call it behind <Suspense>.
+ */
 export async function getSessionUsername(): Promise<string | null> {
-  return decodeSession((await cookies()).get(SESSION_COOKIE)?.value, Date.now());
+  return actorFor(decodeIdentity((await cookies()).get(SESSION_COOKIE)?.value, Date.now()), superAdminName());
 }

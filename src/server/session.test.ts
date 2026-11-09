@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeFlow, decodeSession, encodeFlow, encodeSession } from "./session";
+import { decodeFlow, decodeIdentity, decodeSession, encodeFlow, encodeSession } from "./session";
 
 const NOW = Date.UTC(2026, 9, 26, 10, 0);
 
@@ -24,6 +24,31 @@ describe("session cookie", () => {
     for (const bad of [undefined, "", "abc", "a.b", ".", "a.b.c"]) {
       expect(decodeSession(bad, NOW)).toBeNull();
     }
+  });
+});
+
+describe("the two kinds of session", () => {
+  it("is a Lichess session unless it says otherwise", () => {
+    expect(decodeIdentity(encodeSession("Mercy_K", NOW), NOW)).toEqual({ username: "Mercy_K", admin: false });
+    expect(decodeIdentity(encodeSession("Mercy_K", NOW, "lichess"), NOW)).toEqual({ username: "Mercy_K", admin: false });
+  });
+
+  it("can be the super admin's password sign-in, and still expires after twelve hours", () => {
+    const cookie = encodeSession("Joel", NOW, "admin");
+    expect(decodeIdentity(cookie, NOW)).toEqual({ username: "Joel", admin: true });
+    expect(decodeIdentity(cookie, NOW + 13 * 3600_000)).toBeNull();
+  });
+
+  it("cannot be turned from a Lichess session into a super admin one by editing the cookie", () => {
+    const [, signature] = encodeSession("Joel", NOW).split(".");
+    const forged = Buffer.from(JSON.stringify({ u: "Joel", k: "admin", exp: NOW / 1000 + 3600 })).toString("base64url");
+    expect(decodeIdentity(`${forged}.${signature}`, NOW)).toBeNull();
+  });
+
+  it("reads a cookie made before there were two kinds as a Lichess one", () => {
+    const old = encodeSession("Mercy_K", NOW);
+    expect(JSON.parse(Buffer.from(old.split(".")[0], "base64url").toString())).not.toHaveProperty("k");
+    expect(decodeIdentity(old, NOW)?.admin).toBe(false);
   });
 });
 
