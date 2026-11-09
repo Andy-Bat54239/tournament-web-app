@@ -25,10 +25,11 @@ npm run dev        # http://localhost:3000
 | `npm run lint`      | ESLint                                        |
 | `npm run build`     | Production build                              |
 
-In development, "Log in with Lichess" is a stand-in: type any username. `Joel` is the super admin, `Ruth_Ref` a
-referee, `Dan_Desk` the check-in desk, anyone else a player (try `Mercy_K`, as in the prototype). The demo has 41
-players signed up for Sunday 1 November 2026, 14:00. To see a bracket the size of the prototype's, log in as Joel and
-build it with 8 qualifiers, then log in as one of the two players of the first match and open **My match**. With the
+In development, "Log in with Lichess" is a stand-in: type any username, such as `Ruth_Ref` (a referee), `Dan_Desk` (the
+check-in desk) or `Mercy_K` (a player, as in the prototype). **The super admin does not use it.** On the Organizer tab
+the super admin signs in with a username and a password: in development that is `Joel` and `dev-password`. The demo has
+41 players signed up for Sunday 1 November 2026, 14:00. To see a bracket the size of the prototype's, sign in as Joel
+and build it with 8 qualifiers, then log in as one of the two players of the first match and open **My match**. With the
 mock Lichess a development-only panel plays the part of both players (join, win, draw, abort), so every state can be
 reached by hand. Copy [`.env.example`](.env.example) to change any of this, including `LICHESS_MODE=live`.
 
@@ -39,8 +40,28 @@ person to Lichess and back; the typed-username form is gone, and the server refu
 Nothing is registered with Lichess. The app asks for **no permissions**, only for who the person is, and revokes the
 token the moment it has the username, so it never keeps one.
 
-In production, set `DATABASE_URL`, `CRON_SECRET` (or `BACKGROUND_SYNC=true`), `APP_URL` (https, no path), `SESSION_SECRET`, `LICHESS_MODE=live`, `LICHESS_SERVICE_TOKEN`, and
-`SUPER_ADMIN` as **Joel's real Lichess username**, because the super admin is whoever logs in with that name.
+### Who logs in how
+
+- **Players, referees and the check-in desk log in with Lichess.** That is all they see on Sign up, My match and (for
+  referees and the desk) the Organizer tab.
+- **The super admin signs in with a username and a password**, in a form on the Organizer tab. The username is
+  `SUPER_ADMIN`. The password is never stored: only a salted scrypt hash of it, in `SUPER_ADMIN_PASSWORD_HASH`. Make
+  both with `npm run hash-password`, which makes a random password and shows it once, and puts the hash line on the
+  clipboard (`-- --own` lets you type your own, at least 12 characters, not shown as you type). Paste the line into the
+  host's settings, and keep the password in a password manager. With the setting missing in production, nobody can sign
+  in as the super admin at all. The development password, `dev-password`, is refused in production.
+- **The two never mix.** A Lichess account whose name is the super admin's gets no session (it is told the name is
+  reserved), so owning that Lichess name gives nothing. A session cookie says how the person signed in and cannot be
+  edited. The super admin does not sign up or play, and the player screens say so.
+- **Wrong passwords are slowed down**, per source (a scrambled form of the caller's address, never the address
+  itself): four free tries, then locks of 30 seconds, 1, 2, 4 minutes and so on up to 15, which a right password
+  clears. A lock on a stranger does not lock the real super admin out from somewhere else. The counts are kept with
+  the tournament, so a restart does not reset them, and each sign-in and each lock is in the audit log. A password
+  typed into a form is cleared after a wrong try and is never kept in the page.
+- **To change the password**, run the script again, replace `SUPER_ADMIN_PASSWORD_HASH`, and redeploy. Sessions last 12
+  hours.
+
+In production, set `DATABASE_URL`, `CRON_SECRET` (or `BACKGROUND_SYNC=true`), `APP_URL` (https, no path), `SESSION_SECRET`, `LICHESS_MODE=live`, `LICHESS_SERVICE_TOKEN`, `SUPER_ADMIN` (the super admin's username, such as `joel`; it is not a Lichess account) and `SUPER_ADMIN_PASSWORD_HASH`.
 
 To try the whole thing on a real host with real accounts before the event, follow
 [`docs/dress-rehearsal.md`](docs/dress-rehearsal.md): a deploy checklist, a step-by-step rehearsal script, and what to
@@ -185,8 +206,8 @@ tournament ends (the super admin keeps it). Access is deny-by-default.
 - **Only the super admin manages admins or ends the tournament.** That is not a tick: no one can be given it, and a
   referee who has been ticked for everything else still cannot add an accomplice.
 - Every change is in the audit log with who made it and exactly what was switched on or off.
-- The super admin is whoever logs in with the `SUPER_ADMIN` username, so it is not an admin record and cannot be
-  removed from the app.
+- The super admin is whoever signs in with the `SUPER_ADMIN` username and password (see "Who logs in how"), so it is not
+  an admin record and cannot be removed from the app.
 
 ## Round control
 
