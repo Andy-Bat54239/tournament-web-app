@@ -153,12 +153,15 @@ For every step: **Do**, **Expect**, and write down anything else you see. A tabl
 
 ### B2. Move the start and check in
 
-Check-in only opens an hour before the start, and the start is days away, so bring it forward.
+Check-in only opens an hour before the start, and the start is days away, so bring it forward. Check-in is open from an
+hour before the start until 15 minutes before it. If a player is told "Check-in is closed", the start time you saved is
+already less than 15 minutes away, or in the past: save a later one.
 
-1. Organizer, **Tournament schedule**: set today's date and a start time **40 minutes from now** (East Africa Time),
-   reason "rehearsal", **Save date and time**.
+1. Organizer, **Tournament schedule**: set today's date and a start time **50 minutes from now in East Africa Time**
+   (Kampala, three hours ahead of UTC), reason "rehearsal", **Save date and time**. Look up the time in Kampala: do not
+   use your computer's clock if you are in another time zone (a Mac set to Central Africa Time is an hour behind).
 2. Expect: the page says "Schedule changed", the sign-up page of each player shows check-in open.
-3. Each of the three: **Check in**. Expect "You're checked in."
+3. Each of the three: **Check in**, straight away. Expect "You're checked in."
 4. Organizer: **Remove no-shows and promote the waitlist**. The five invented players who did not check in go.
 
 ### B3. The Swiss, on Lichess
