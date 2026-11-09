@@ -1,6 +1,7 @@
 import "server-only";
 import { buildBracket, type Bracket } from "@/domain/bracket";
 import { planFormat, seedByRating } from "@/domain/format";
+import { afterFailure, afterSuccess, lockedFor, waitText, type Attempts } from "@/domain/login-throttle";
 import {
   noShowOverride,
   resolveBracket,
@@ -114,6 +115,8 @@ export interface PersistedState {
   registrations: Registration[];
   admins: AdminRecord[];
   audit: AuditEntry[];
+  /** Wrong guesses at the super admin's password, per source. Missing from a state saved before sign-in had a password. */
+  signInAttempts?: Attempts;
 }
 
 export interface StoreConfig {
@@ -121,7 +124,8 @@ export interface StoreConfig {
   registrations?: Registration[];
   admins?: AdminRecord[];
   audit?: AuditEntry[];
-  /** Lichess username of the super admin (Joel). */
+  signInAttempts?: Attempts;
+  /** The super admin's username. It signs in with a password, not with Lichess. */
   superAdmin: string | null;
 }
 
@@ -143,6 +147,7 @@ export class Store {
   registrations: Registration[];
   admins: AdminRecord[];
   audit: AuditEntry[];
+  signInAttempts: Attempts;
   /** Playing the matches: waiting windows, links, reading results, claims and problem reports. */
   readonly play: MatchPlayService;
   private readonly superAdmin: string | null;
@@ -153,6 +158,7 @@ export class Store {
     this.registrations = config.registrations ?? [];
     this.admins = config.admins ?? [];
     this.audit = config.audit ?? [];
+    this.signInAttempts = config.signInAttempts ?? {};
     this.superAdmin = config.superAdmin;
   }
 
@@ -169,6 +175,7 @@ export class Store {
       registrations: state.registrations,
       admins: state.admins,
       audit: state.audit,
+      signInAttempts: state.signInAttempts,
       superAdmin,
     });
   }
@@ -180,6 +187,7 @@ export class Store {
       registrations: this.registrations,
       admins: this.admins,
       audit: this.audit,
+      signInAttempts: this.signInAttempts,
     };
   }
 
@@ -278,6 +286,29 @@ export class Store {
   /** Writes to the audit log. Automatic actions use "Lichess" as the actor. */
   log(actor: string, now: Date, action: string, reason?: string) {
     this.audit.push({ at: now.toISOString(), actor, action, ...(reason ? { reason } : {}) });
+  }
+
+  /** How long this source must still wait before it may try the super admin's password again, in milliseconds. */
+  signInWait(source: string, now: Date): number {
+    return lockedFor(this.signInAttempts, source, now);
+  }
+
+  /**
+   * Counts one try at the super admin's password. A right one clears the count; a wrong one may earn a lock, which
+   * is written to the audit log along with each sign-in.
+   */
+  recordSignIn(source: string, ok: boolean, now: Date): { lockedMs: number } {
+    if (ok) {
+      this.signInAttempts = afterSuccess(this.signInAttempts, source);
+      this.log(this.superAdmin ?? "Super admin", now, "Signed in.");
+      return { lockedMs: 0 };
+    }
+    const next = afterFailure(this.signInAttempts, source, now);
+    this.signInAttempts = next.attempts;
+    if (next.lockedMs > 0) {
+      this.log("Sign-in", now, `Locked the super admin sign-in for one source for ${waitText(next.lockedMs)} after repeated wrong passwords.`);
+    }
+    return { lockedMs: next.lockedMs };
   }
 
   removeNoShows(actor: string, now: Date): Result<{ removed: string[]; promoted: string[] }> {

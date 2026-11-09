@@ -536,3 +536,48 @@ describe("managing admins", () => {
   });
 });
 
+
+describe("signing in as the super admin", () => {
+  const NOW = eat("2026-11-01", "12:00");
+  const wrongTimes = (store: Store, source: string, n: number) => {
+    let last = { lockedMs: 0 };
+    for (let i = 0; i < n; i++) last = store.recordSignIn(source, false, new Date(NOW.getTime() + i * 1000));
+    return last;
+  };
+
+  it("lets a source guess wrongly a few times, then locks it, and says so in the audit log", () => {
+    const store = makeStore(0);
+    expect(wrongTimes(store, "s1", 4).lockedMs).toBe(0);
+    expect(store.audit).toEqual([]);
+    expect(wrongTimes(store, "s1", 1).lockedMs).toBe(30_000);
+    expect(store.signInWait("s1", new Date(NOW.getTime() + 5000))).toBeGreaterThan(0);
+    expect(store.audit.at(-1)).toMatchObject({ actor: "Sign-in", action: expect.stringContaining("Locked the super admin sign-in") });
+  });
+
+  it("locks only the source that guessed", () => {
+    const store = makeStore(0);
+    wrongTimes(store, "stranger", 6);
+    expect(store.signInWait("stranger", NOW)).toBeGreaterThan(0);
+    expect(store.signInWait("the-real-admin", NOW)).toBe(0);
+  });
+
+  it("clears the count on a right password and logs the sign-in under the super admin's name", () => {
+    const store = makeStore(0);
+    wrongTimes(store, "s1", 6);
+    store.recordSignIn("s1", true, new Date(NOW.getTime() + 60_000));
+    expect(store.signInWait("s1", new Date(NOW.getTime() + 61_000))).toBe(0);
+    expect(store.signInAttempts).toEqual({});
+    expect(store.audit.at(-1)).toMatchObject({ actor: "Joel", action: "Signed in." });
+  });
+
+  it("keeps the count when the state is saved and loaded, and loads a state saved before it existed", () => {
+    const store = makeStore(0);
+    wrongTimes(store, "s1", 6);
+    const loaded = Store.fromState(JSON.parse(JSON.stringify(store.snapshot())), "Joel");
+    expect(loaded.signInWait("s1", NOW)).toBeGreaterThan(0);
+
+    const old = JSON.parse(JSON.stringify(makeStore(0).snapshot()));
+    delete old.signInAttempts;
+    expect(Store.fromState(old, "Joel").signInAttempts).toEqual({});
+  });
+});
