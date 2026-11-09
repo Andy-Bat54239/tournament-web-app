@@ -4,10 +4,12 @@ import { randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
  * Password hashing for the super admin's sign-in. A password is never kept: only a salted scrypt hash of it, as one
  * line of text that can sit in a host's settings (`SUPER_ADMIN_PASSWORD_HASH`):
  *
- *   scrypt$<N>$<r>$<p>$<salt>$<hash>
+ *   scrypt:<N>:<r>:<p>:<salt>:<hash>
  *
- * The cost is written into the line, so it can be raised later without breaking a hash made earlier. This file is
- * plain Node, with no framework in it, so `scripts/hash-password.mjs` can use it too.
+ * Colons, not dollar signs, so the line can sit in a .env file as well as in a host's settings page: an env file
+ * reader treats $32768 as a variable and quietly drops it. The cost is written into the line, so it can be raised
+ * later without breaking a hash made earlier. This file is plain Node, with no framework in it, so
+ * `scripts/hash-password.mjs` can use it too.
  */
 
 const COST = { N: 32768, r: 8, p: 1 } as const;
@@ -29,12 +31,12 @@ function derive(password: string, salt: Buffer, cost: { N: number; r: number; p:
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(SALT_BYTES);
   const key = await derive(password, salt, COST);
-  return ["scrypt", COST.N, COST.r, COST.p, salt.toString("base64url"), key.toString("base64url")].join("$");
+  return ["scrypt", COST.N, COST.r, COST.p, salt.toString("base64url"), key.toString("base64url")].join(":");
 }
 
 /** True only if `password` is the one the hash was made from. A hash that is not in the format above never matches. */
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  const [kind, n, r, p, salt, hash, ...extra] = stored.trim().split("$");
+  const [kind, n, r, p, salt, hash, ...extra] = stored.trim().split(":");
   if (kind !== "scrypt" || !hash || extra.length > 0) return false;
   const cost = { N: Number(n), r: Number(r), p: Number(p) };
   if (![cost.N, cost.r, cost.p].every((v) => Number.isInteger(v) && v > 0)) return false;

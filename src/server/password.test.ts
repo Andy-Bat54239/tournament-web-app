@@ -21,9 +21,9 @@ describe("hashPassword and verifyPassword", () => {
     expect(await verifyPassword("same password here", b)).toBe(true);
   });
 
-  it("writes the cost into the line and never the password", async () => {
+  it("writes the cost into the line, with colons so an env file keeps it, and never the password", async () => {
     const hash = await hashPassword("a very private password");
-    expect(hash).toMatch(/^scrypt\$32768\$8\$1\$[\w-]+\$[\w-]+$/);
+    expect(hash).toMatch(/^scrypt:32768:8:1:[\w-]+:[\w-]+$/);
     expect(hash).not.toContain("private");
   });
 
@@ -33,14 +33,14 @@ describe("hashPassword and verifyPassword", () => {
   });
 
   it("never matches a line that is not in the format", async () => {
-    for (const bad of ["", "scrypt", "scrypt$1$2$3", "bcrypt$32768$8$1$AAAA$BBBB", "scrypt$x$8$1$AAAA$BBBB", "scrypt$32768$8$1$AAAA$", "scrypt$32768$8$1$AAAA$BBBB$extra"]) {
+    for (const bad of ["", "scrypt", "scrypt:1:2:3", "bcrypt:32768:8:1:AAAA:BBBB", "scrypt:x:8:1:AAAA:BBBB", "scrypt:32768:8:1:AAAA:", "scrypt:32768:8:1:AAAA:BBBB:extra", "scrypt$32768$8$1$AAAA$BBBB"]) {
       expect(await verifyPassword("anything at all", bad)).toBe(false);
     }
   });
 
   it("refuses a cost that is not a power of two or would hang the server", async () => {
-    expect(await verifyPassword("anything at all", "scrypt$1000$8$1$AAAA$BBBB")).toBe(false);
-    expect(await verifyPassword("anything at all", `scrypt$${2 ** 30}$8$1$AAAA$BBBB`)).toBe(false);
+    expect(await verifyPassword("anything at all", "scrypt:1000:8:1:AAAA:BBBB")).toBe(false);
+    expect(await verifyPassword("anything at all", `scrypt:${2 ** 30}:8:1:AAAA:BBBB`)).toBe(false);
   });
 });
 
