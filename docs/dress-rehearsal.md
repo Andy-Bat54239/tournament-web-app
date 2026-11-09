@@ -47,9 +47,23 @@ Neon console, your project, **SQL Editor**, run exactly this, and nothing else:
 delete from tournament_state;
 ```
 
-### A3. Make two secrets
+### A3. Make three secrets
 
-In a terminal, one at a time. Each command puts a long random string on the clipboard and shows nothing:
+The super admin signs in with a **username and a password** (not with Lichess). The app keeps only a hash of the
+password, in a setting called `SUPER_ADMIN_PASSWORD_HASH`. Players, referees and the check-in desk keep using Lichess.
+
+**First, the super admin's password.** In a terminal, in the `web` folder:
+
+```bash
+npm run hash-password
+```
+
+It makes a random password and prints it **once**: write it down or put it in a password manager, because it is kept
+nowhere else. It also puts the hash line on your clipboard. Paste that line at once into Vercel as
+`SUPER_ADMIN_PASSWORD_HASH` (A4). If you would rather type your own password (at least 12 characters, not shown as you
+type), run `npm run hash-password -- --own`.
+
+**Then two random strings.** Each command puts a long random string on the clipboard and shows nothing:
 
 ```bash
 openssl rand -base64 48 | pbcopy
@@ -70,7 +84,8 @@ Use it at once (A4), then run the command again for the second one. The first is
 | `SESSION_SECRET` | the first secret from A3 | |
 | `LICHESS_MODE` | `live` | The real Lichess. The login becomes the real one by itself. |
 | `LICHESS_SERVICE_TOKEN` | a new token, see below | |
-| `SUPER_ADMIN` | **your own** Lichess username | Joel's at the event. It must match the name you log in with. |
+| `SUPER_ADMIN` | a username you choose, such as `joel` | The super admin's sign-in name. It is not a Lichess account, and a Lichess account with this name cannot log in. |
+| `SUPER_ADMIN_PASSWORD_HASH` | the line from `npm run hash-password` | Without it nobody can sign in as the super admin. |
 | `SEED_DEMO` | `true` | **Rehearsal only.** 41 invented players pad the field to 17 or more, so the Swiss format runs. |
 | `CRON_SECRET` | the second secret from A3 | |
 
@@ -110,8 +125,8 @@ first time you open the Organizer page.
 | ------- | ------ |
 | Open the address on your phone | The sign-up page, "Tournament starts Sunday 1 November, 14:00" |
 | Open `/bracket` | "The bracket is not built yet." and, within a few seconds, no error |
-| Log in as yourself (the button on the sign-up page) | Lichess asks to log in and shows **no permissions list**, then you come back logged in as your username |
-| Open `/organizer` | The full organizer screen. If it says you cannot see it, `SUPER_ADMIN` does not match your username |
+| Open `/organizer` and sign in with the super admin username and password | The full organizer screen, "Logged in as <name> (super admin)". Check that the sign-up page then says you are signed in as the super admin |
+| Log out, then log in with one of the three test accounts (the Lichess button on the sign-up page) | Lichess asks to log in and shows **no permissions list**, then you come back as that player |
 | Open `https://<address>/api/sync` in the browser | `{"error":"Not allowed."}` with status 401. That is correct: strangers are refused |
 | Organizer, Admins | Remove `Ruth_Ref` and `Dan_Desk` |
 
@@ -238,7 +253,10 @@ Copy this into a note and fill it in as you go.
 | "APP_URL must start with https://" | `APP_URL` was typed without `https://` |
 | Pages stay on "Loading…", or the log says "Connection terminated due to connection timeout" | `DATABASE_URL` is wrong, or still has `sslmode=require` with a typo. Neon also sleeps after idle time, so the first page after a quiet spell is slow |
 | The login goes to Lichess but comes back with an error | `APP_URL` is not exactly the address in the browser (www, http, a trailing path, or a different Vercel address) |
-| Logged in, but no Organizer | `SUPER_ADMIN` is not your Lichess username, or it was changed and the app was not redeployed |
+| The sign-in says "not switched on" | `SUPER_ADMIN` or `SUPER_ADMIN_PASSWORD_HASH` is missing in Production, or the app was not redeployed after adding it |
+| The sign-in says "do not match" with the right password | The hash line was cut or changed when pasted (it is one long line starting `scrypt:`): run the script again and paste again. Check the username is exactly `SUPER_ADMIN` (capitals do not matter) |
+| "Too many wrong tries. Try again in …" | Four wrong passwords in a row from one place lock it for 30 seconds, then longer. Wait it out. A right password clears it |
+| A Lichess login says "That Lichess name is reserved" | The Lichess account has the same name as `SUPER_ADMIN`. Choose a different `SUPER_ADMIN` name |
 | The login box asks you to type a username | `LICHESS_MODE` is not `live` in Production, or the app was not redeployed |
 | `/api/sync` says 503 | `CRON_SECRET` is not set, or the app was not redeployed after setting it |
 | `/api/sync` says 401 in the pinger | The header is wrong: it must be `Authorization: Bearer <the secret>` with one space |
@@ -250,12 +268,13 @@ Copy this into a note and fill it in as you go.
 ## Before the real event
 
 1. **Clear the rehearsal.** Neon SQL Editor: `delete from tournament_state;`.
-2. **Change the settings** in Vercel and redeploy: `SEED_DEMO` removed (or `false`), `SUPER_ADMIN` = Joel's real Lichess
-   username, `LICHESS_SERVICE_TOKEN` = a token from the account Castle Connect wants the game links to come from
+2. **Change the settings** in Vercel and redeploy: `SEED_DEMO` removed (or `false`), `SUPER_ADMIN` = the username Joel
+   will sign in with, and `SUPER_ADMIN_PASSWORD_HASH` = a hash from **Joel running `npm run hash-password` himself**,
+   so only he knows his password (do not reuse the rehearsal one), `LICHESS_SERVICE_TOKEN` = a token from the account Castle Connect wants the game links to come from
    (scopes `challenge:read` and `challenge:write` only), and `TOURNAMENT_START` and `TOURNAMENT_CAP` as decided.
    Make a new `SESSION_SECRET` if the old one was ever shown to anyone.
 3. **Revoke the throwaway tokens** at https://lichess.org/account/oauth/token, for all three accounts, and the
    `rehearsal` one if the real token replaces it.
-4. **Open the address once as Joel** and check the Organizer page is there. The first load on the empty database
+4. **Open the address once and sign in as Joel** on the Organizer tab, and check the Organizer page is there. The first load on the empty database
    creates the tournament from the settings.
 5. Look at the pinger: **Test run** again, and check the job is still enabled.
