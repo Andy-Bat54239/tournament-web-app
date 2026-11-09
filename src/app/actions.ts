@@ -1,19 +1,21 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { headers } from "next/headers";
 import { unstable_rethrow } from "next/navigation";
 import { isPreset } from "@/domain/permissions";
 import { LICHESS_USERNAME, type Result } from "@/domain/registration";
 import type { GameOutcome } from "@/domain/match";
 import type { FormState } from "@/lib/form-state";
 import { parseSwissId, swissProgress } from "@/domain/swiss";
-import { loginMode } from "@/server/auth-config";
+import { attemptAdminSignIn } from "@/server/admin-login";
+import { adminPassword, isSuperAdminName, loginMode, superAdminName } from "@/server/auth-config";
 import { readStore, updateStore } from "@/server/instance";
 import { getLichess, getMockLichess } from "@/server/lichess";
 import { ask } from "@/server/lichess/ask";
 import type { SimulatedEvent } from "@/server/lichess/mock";
 import { StoreBusy } from "@/server/provider";
-import { clearSession, getSessionUsername, setSession } from "@/server/session";
+import { clearSession, getSessionUsername, setSession, sourceKey } from "@/server/session";
 import { standingsFor } from "@/server/swiss";
 
 /**
@@ -48,7 +50,12 @@ async function asUser(run: (username: string) => Promise<FormState> | FormState)
   }
 }
 
-// Login. The mock stands in for Lichess OAuth until the API checks are done.
+/** For what a player does. The super admin organizes and does not play, so these are not theirs to use. */
+function asPlayer(run: (username: string) => Promise<FormState> | FormState): Promise<FormState> {
+  return asUser((username) => (isSuperAdminName(username) ? { error: "The super admin signs in to organize, not to play." } : run(username)));
+}
+
+// Login. Players, referees and the check-in desk log in with Lichess. The mock stands in for that in development.
 
 export async function mockLogin(_prev: FormState, data: FormData): Promise<FormState> {
   // Server Actions are public endpoints, so this must refuse even when the page shows the real login.
@@ -58,7 +65,30 @@ export async function mockLogin(_prev: FormState, data: FormData): Promise<FormS
   }
   const profile = await getLichess().getProfile(text(data, "username"));
   if (!profile) return { error: "Enter a Lichess username: letters, numbers, _ or -." };
+  // The super admin's name belongs to the password sign-in, as it does for the real Lichess login.
+  if (isSuperAdminName(profile.username)) return { error: "That name belongs to the organizer account. Use a different name." };
   await setSession(profile.username);
+  refresh();
+  return null;
+}
+
+/** The super admin's sign-in, with a username and a password. Nothing else can start a super admin session. */
+export async function adminLogin(_prev: FormState, data: FormData): Promise<FormState> {
+  const name = superAdminName();
+  const requestHeaders = await headers();
+  const address = requestHeaders.get("x-forwarded-for")?.split(",")[0].trim() || requestHeaders.get("x-real-ip") || "unknown";
+  const result = await attemptAdminSignIn(
+    // The password is used exactly as typed: not trimmed, not changed.
+    { username: String(data.get("username") ?? ""), password: String(data.get("password") ?? ""), source: sourceKey(address), now: new Date() },
+    { name, password: adminPassword(), update: updateStore },
+  ).catch((error) => {
+    unstable_rethrow(error);
+    if (error instanceof StoreBusy) return { ok: false, error: "Many people are using the app at once. Try again in a moment." } as const;
+    console.error(error);
+    return { ok: false, error: "Something went wrong. Try again in a moment." } as const;
+  });
+  if (!result.ok || !name) return { error: result.ok ? "Super admin sign-in is not switched on." : result.error };
+  await setSession(name, "admin");
   refresh();
   return null;
 }
@@ -71,7 +101,7 @@ export async function logout(): Promise<void> {
 // Players
 
 export async function signUp(_prev: FormState, data: FormData): Promise<FormState> {
-  return asUser(async (username) => {
+  return asPlayer(async (username) => {
     const profile = await getLichess().getProfile(username);
     if (!profile) return { error: "We could not find your Lichess account." };
     const whatsapp = text(data, "whatsapp");
@@ -82,21 +112,21 @@ export async function signUp(_prev: FormState, data: FormData): Promise<FormStat
 }
 
 export async function joinTeam(): Promise<FormState> {
-  return asUser(async (username) => finish(await updateStore((store) => store.joinTeam(username)), "Joined."));
+  return asPlayer(async (username) => finish(await updateStore((store) => store.joinTeam(username)), "Joined."));
 }
 
 export async function checkIn(): Promise<FormState> {
-  return asUser(async (username) => finish(await updateStore((store) => store.checkIn(username, new Date())), "Checked in."));
+  return asPlayer(async (username) => finish(await updateStore((store) => store.checkIn(username, new Date())), "Checked in."));
 }
 
 export async function withdraw(): Promise<FormState> {
-  return asUser(async (username) => finish(await updateStore((store) => store.withdraw(username, new Date())), "You’ve withdrawn."));
+  return asPlayer(async (username) => finish(await updateStore((store) => store.withdraw(username, new Date())), "You’ve withdrawn."));
 }
 
 // Playing a match
 
 export async function markReady(): Promise<FormState> {
-  return asUser(async (username) => {
+  return asPlayer(async (username) => {
     const result = await updateStore(async (store): Promise<Result<{ linked: boolean }>> => {
       const now = new Date();
       const ready = store.play.markReady(username, now);
@@ -112,7 +142,7 @@ export async function markReady(): Promise<FormState> {
 }
 
 export async function getGameLink(): Promise<FormState> {
-  return asUser(async (username) => {
+  return asPlayer(async (username) => {
     const link = await updateStore((store) => store.play.ensureLink(username, getLichess(), new Date()));
     return finish(link, "Your game link is ready.");
   });
@@ -120,7 +150,7 @@ export async function getGameLink(): Promise<FormState> {
 
 /** Called by the match screen every few seconds. Reads the game from Lichess and refreshes the screen. */
 export async function syncMyMatch(): Promise<FormState> {
-  return asUser(async (username) => {
+  return asPlayer(async (username) => {
     const read = await updateStore((store) => {
       const mine = store.play.openMatchOf(username);
       return mine ? store.play.syncGame(mine.match.id, getLichess(), new Date()) : null;
@@ -131,13 +161,13 @@ export async function syncMyMatch(): Promise<FormState> {
 }
 
 export async function claimWin(): Promise<FormState> {
-  return asUser(async (username) =>
+  return asPlayer(async (username) =>
     finish(await updateStore((store) => store.play.claimWin(username, getLichess(), new Date())), "Your claim is with a referee."),
   );
 }
 
 export async function reportProblem(_prev: FormState, data: FormData): Promise<FormState> {
-  return asUser(async (username) => {
+  return asPlayer(async (username) => {
     const body = text(data, "text");
     return finish(await updateStore((store) => store.play.reportProblem(username, body, new Date())), "Sent to the referees.");
   });

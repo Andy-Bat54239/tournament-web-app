@@ -95,6 +95,14 @@ export async function setSession(username: string, kind: "lichess" | "admin" = "
   (await cookies()).set(SESSION_COOKIE, encodeSession(username, Date.now(), kind), sessionCookieOptions());
 }
 
+/**
+ * A short scrambled form of a caller's address, so wrong passwords can be counted per source without keeping the
+ * address itself. Keyed with the session secret, so it cannot be worked back from a list of addresses.
+ */
+export function sourceKey(address: string): string {
+  return createHmac("sha256", secret()).update(`source:${address}`).digest("base64url").slice(0, 22);
+}
+
 export async function clearSession(): Promise<void> {
   (await cookies()).delete(SESSION_COOKIE);
 }

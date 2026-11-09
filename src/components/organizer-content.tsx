@@ -10,6 +10,7 @@ import { buildRoundBoard } from "@/server/round-board";
 import { getSessionUsername } from "@/server/session";
 import { swissStandings, type SwissStandings } from "@/server/swiss";
 import { getSwissFeed } from "@/server/swiss-feed";
+import { AdminLoginCard } from "./admin-login-card";
 import { AutoRefresh } from "./auto-refresh";
 import { LoginCard } from "./login-card";
 import {
@@ -44,7 +45,11 @@ export async function OrganizerContent() {
   if (!username) {
     return (
       <>
-        <p className="note">Log in with Lichess to see the organizer tools.</p>
+        <p className="note">
+          The super admin signs in with a username and password. Referees and the check-in desk log in with Lichess.
+        </p>
+        <AdminLoginCard />
+        <h3 className="spaced-heading">Referees and the check-in desk</h3>
         <LoginCard next="/organizer" />
       </>
     );

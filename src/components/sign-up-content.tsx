@@ -144,7 +144,9 @@ export async function SignUpContent() {
   const username = await getSessionUsername();
   const me = username ? store.registration(username) : undefined;
   const signedUp = me?.status === "registered" || me?.status === "waitlisted";
-  const profile = username && !signedUp ? await getLichess().getProfile(username) : null;
+  // The super admin organizes and does not play, so there is nothing to sign up here.
+  const organizer = username !== null && store.access(username)?.superAdmin === true;
+  const profile = username && !signedUp && !organizer ? await getLichess().getProfile(username) : null;
   const regs = store.registrations;
 
   return (
@@ -158,6 +160,11 @@ export async function SignUpContent() {
       />
       {!username ? (
         <LoginCard next="/" />
+      ) : organizer ? (
+        <div className="card">
+          <p className="strong">You are signed in as the super admin.</p>
+          <p className="note">The organizer tools are on the Organizer tab. Players sign up here with Lichess.</p>
+        </div>
       ) : me && signedUp ? (
         <ConfirmedCard
           me={me}
@@ -183,7 +190,7 @@ export async function SignUpContent() {
       )}
       {username && (
         <form action={logout} className="who">
-          <span>Logged in as {username}.</span>
+          <span>{organizer ? "Signed in" : "Logged in"} as {username}.</span>
           <button type="submit" className="quiet">
             Log out
           </button>

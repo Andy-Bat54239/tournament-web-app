@@ -31,8 +31,8 @@ export function LoginCard({ next = "/" }: { next?: string }) {
       <p className="note">Your username comes from Lichess. The app never sees your password.</p>
       {process.env.NODE_ENV !== "production" && (
         <p className="note dev">
-          Development mode: this is a stand-in for the real login, so type any username. Joel is the super admin,
-          Ruth_Ref a referee and Dan_Desk the check-in desk.
+          Development mode: this is a stand-in for the real login, so type any username, such as Ruth_Ref (a referee),
+          Dan_Desk (the check-in desk) or Mercy_K (a player). The super admin does not use it: see the Organizer tab.
         </p>
       )}
     </div>
