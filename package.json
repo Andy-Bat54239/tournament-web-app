@@ -10,7 +10,7 @@
     "test": "vitest run",
     "typecheck": "next typegen && tsc --noEmit",
     "db:reset": "node -e \"require('node:fs').rmSync('.data/pglite',{recursive:true,force:true});console.log('Local database cleared.')\"",
-    "hash-password": "node --disable-warning=ExperimentalWarning scripts/hash-password.mjs"
+    "hash-password": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/hash-password.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.12",
