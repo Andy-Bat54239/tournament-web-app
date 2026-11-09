@@ -128,6 +128,17 @@ describe("coming back from Lichess", () => {
     expect(response.headers.get("location")).toBe(`${ORIGIN}/login/error?reason=expired`);
   });
 
+  it("starts no session for a Lichess account that has the super admin's name, however it is written", async () => {
+    vi.stubEnv("SUPER_ADMIN", "MERCY_k");
+    const calls = lichessSays(goodLichess());
+    const response = await returning("code=the-code&state=state-abc-123");
+    expect(response.headers.get("location")).toBe(`${ORIGIN}/login/error?reason=reserved`);
+    expect(response.cookies.get(SESSION_COOKIE)).toBeUndefined();
+    expect(response.cookies.get(FLOW_COOKIE)).toMatchObject({ maxAge: 0 });
+    // The token is still given back.
+    expect(calls.at(-1)).toBe("DELETE /api/token");
+  });
+
   it("is not available when the stand-in login is the chosen mode", async () => {
     vi.stubEnv("LICHESS_LOGIN", "mock");
     const response = await returning("code=c&state=state-abc-123");

@@ -25,6 +25,10 @@ const MESSAGES: Record<string, { title: string; body: string }> = {
     title: "That Lichess account can’t be used.",
     body: "It is closed or restricted on Lichess. Log in with a different account.",
   },
+  reserved: {
+    title: "That Lichess name is reserved.",
+    body: "It belongs to the organizer account, which signs in with a password. Log in with a different Lichess account.",
+  },
   unavailable: {
     title: "Logging in with Lichess is not switched on yet.",
     body: "Please ask an organizer.",

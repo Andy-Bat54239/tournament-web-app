@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { appOrigin, clientId, loginMode, redirectUri } from "@/server/auth-config";
+import { appOrigin, clientId, isSuperAdminName, loginMode, redirectUri } from "@/server/auth-config";
 import { completeLogin } from "@/server/login";
 import {
   FLOW_COOKIE,
@@ -25,10 +25,13 @@ export async function GET(request: NextRequest) {
     redirectUri: redirectUri(request.url),
   });
 
-  const response = NextResponse.redirect(new URL(result.ok ? result.next : `/login/error?reason=${result.reason}`, origin));
+  // The super admin's name belongs to the password sign-in. A Lichess account with the same name gets no session.
+  const reserved = result.ok && isSuperAdminName(result.username);
+  const target = reserved ? "/login/error?reason=reserved" : result.ok ? result.next : `/login/error?reason=${result.reason}`;
+  const response = NextResponse.redirect(new URL(target, origin));
   // The login is used up, whether or not it worked. A second return with the same code gets nowhere.
   response.cookies.set(FLOW_COOKIE, "", { ...flowCookieOptions(), maxAge: 0 });
-  if (result.ok) response.cookies.set(SESSION_COOKIE, encodeSession(result.username, Date.now()), sessionCookieOptions());
+  if (result.ok && !reserved) response.cookies.set(SESSION_COOKIE, encodeSession(result.username, Date.now()), sessionCookieOptions());
   response.headers.set("Cache-Control", "no-store");
   return response;
 }
